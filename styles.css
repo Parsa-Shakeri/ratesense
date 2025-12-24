@@ -1,1 +1,188 @@
+/* styles.css */
+:root{
+  --bg:#0b0d12;
+  --card:#121621;
+  --text:#e9edf5;
+  --muted:#a9b3c7;
+  --line:#1e2636;
+  --accent:#6ea8fe;
+  --accent2:#78f3d3;
+  --shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background: radial-gradient(1200px 800px at 20% 0%, #111a2c 0%, var(--bg) 55%) fixed;
+  color:var(--text);
+}
+
+.wrap{max-width:980px; margin:0 auto; padding:18px}
+.header{
+  display:flex; gap:14px; align-items:center; justify-content:space-between;
+  position:sticky; top:0; z-index:10;
+  background: rgba(11,13,18,.75);
+  backdrop-filter: blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.brand{display:flex; gap:12px; align-items:center}
+.logo{
+  width:42px; height:42px; border-radius:12px;
+  display:grid; place-items:center;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color:#061018; font-weight:800;
+}
+.title{font-weight:800; letter-spacing:.2px}
+.subtitle{color:var(--muted); font-size:13px; margin-top:2px}
+
+.nav{display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end}
+.nav a{
+  color:var(--muted); text-decoration:none; font-weight:600; font-size:13px;
+  padding:8px 10px; border-radius:10px;
+}
+.nav a:hover{color:var(--text); background:rgba(255,255,255,.06)}
+
+.card{
+  background:rgba(18,22,33,.92);
+  border:1px solid var(--line);
+  border-radius:18px;
+  box-shadow: var(--shadow);
+  padding:18px;
+  margin:18px 0;
+}
+
+h1{margin:0 0 12px; font-size:20px}
+h2{margin:16px 0 10px; font-size:15px; color:var(--text)}
+h3{margin:0 0 8px; font-size:14px}
+p{color:var(--text); line-height:1.5}
+.muted{color:var(--muted)}
+.mt{margin-top:18px}
+
+.grid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap:12px;
+}
+@media (max-width:720px){
+  .grid{grid-template-columns:1fr}
+  .nav{justify-content:flex-start}
+}
+
+.field label{
+  display:block;
+  font-size:12px;
+  color:var(--muted);
+  margin-bottom:6px;
+}
+.field input, .field select{
+  width:100%;
+  background:#0e1220;
+  border:1px solid var(--line);
+  color:var(--text);
+  border-radius:12px;
+  padding:11px 12px;
+  outline:none;
+}
+.field input:focus, .field select:focus{border-color: rgba(110,168,254,.75)}
+.hint{color:var(--muted); font-size:12px; margin-top:6px}
+
+.actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:14px;
+  flex-wrap:wrap;
+}
+.btn{
+  background:rgba(255,255,255,.06);
+  border:1px solid var(--line);
+  color:var(--text);
+  padding:10px 12px;
+  border-radius:12px;
+  cursor:pointer;
+  font-weight:700;
+}
+.btn:hover{background:rgba(255,255,255,.10)}
+.btn.primary{
+  background:linear-gradient(135deg, rgba(110,168,254,.95), rgba(120,243,211,.80));
+  color:#061018;
+  border:none;
+}
+.status{color:var(--muted); font-size:12px}
+
+.results{
+  display:grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap:12px;
+  margin-top:14px;
+}
+@media (max-width:900px){
+  .results{grid-template-columns: repeat(2, minmax(0,1fr))}
+}
+.resultCard{
+  background:#0e1220;
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:12px;
+}
+.resultCard .k{color:var(--muted); font-size:12px}
+.resultCard .v{font-size:18px; font-weight:900; margin-top:6px}
+.resultCard .s{color:var(--muted); font-size:12px; margin-top:4px}
+
+.tableWrap{
+  overflow:auto;
+  border:1px solid var(--line);
+  border-radius:14px;
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+  min-width:720px;
+}
+th, td{
+  padding:10px 10px;
+  border-bottom:1px solid var(--line);
+  text-align:left;
+  font-size:13px;
+}
+th{color:var(--muted); font-weight:800; background:rgba(255,255,255,.03)}
+tr:hover td{background:rgba(255,255,255,.02)}
+
+.footnote{margin-top:10px; color:var(--muted); font-size:12px}
+
+.scenarioGrid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap:12px;
+}
+@media (max-width:720px){ .scenarioGrid{grid-template-columns:1fr} }
+
+.scenario{
+  text-align:left;
+  padding:14px;
+}
+.scenarioTitle{font-weight:900}
+.scenarioDesc{color:var(--muted); font-size:13px; margin-top:4px}
+
+.learnGrid{
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap:12px;
+}
+@media (max-width:720px){ .learnGrid{grid-template-columns:1fr} }
+
+.learnBox{
+  background:#0e1220;
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:12px;
+}
+
+.footer{
+  border-top:1px solid var(--line);
+  padding-top:18px;
+  padding-bottom:28px;
+}
 
