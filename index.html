@@ -1,1 +1,211 @@
+<!-- index.html -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RateSense</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="wrap header">
+    <div class="brand">
+      <div class="logo">RS</div>
+      <div>
+        <div class="title">RateSense</div>
+        <div class="subtitle">Turn rate headlines into real monthly payment impacts.</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <a href="#calculator">Calculator</a>
+      <a href="#scenarios">Scenarios</a>
+      <a href="#learn">Learn</a>
+      <a href="#about">About</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <!-- CALCULATOR -->
+    <section id="calculator" class="card">
+      <h1>Calculator</h1>
+
+      <div class="grid">
+        <div class="field">
+          <label for="loanType">Loan type</label>
+          <select id="loanType">
+            <option value="mortgage">Mortgage</option>
+            <option value="auto">Auto loan</option>
+            <option value="student">Student loan</option>
+            <option value="creditcard">Credit card</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="principal">Principal / Balance ($)</label>
+          <input id="principal" type="number" inputmode="decimal" min="0" placeholder="350000" />
+        </div>
+
+        <div class="field amortizedOnly">
+          <label for="termYears">Term (years)</label>
+          <input id="termYears" type="number" inputmode="numeric" min="1" placeholder="30" />
+        </div>
+
+        <div class="field">
+          <label for="apr">APR (%)</label>
+          <input id="apr" type="number" inputmode="decimal" min="0" step="0.01" placeholder="6.50" />
+        </div>
+
+        <div class="field creditOnly">
+          <label for="ccMode">Credit card payment mode</label>
+          <select id="ccMode">
+            <option value="minimum">Minimum payment (2% or $25)</option>
+            <option value="fixed">Fixed monthly payment</option>
+          </select>
+        </div>
+
+        <div class="field creditOnly">
+          <label for="ccFixedPayment">Fixed payment ($)</label>
+          <input id="ccFixedPayment" type="number" inputmode="decimal" min="0" placeholder="200" />
+          <div class="hint">Used only if mode = Fixed monthly payment.</div>
+        </div>
+
+        <div class="field">
+          <label for="delta">Rate change scenario</label>
+          <select id="delta">
+            <option value="0">No change</option>
+            <option value="0.25">+0.25%</option>
+            <option value="0.50">+0.50%</option>
+            <option value="1.00">+1.00%</option>
+            <option value="custom">Custom…</option>
+          </select>
+        </div>
+
+        <div class="field" id="customDeltaWrap" style="display:none;">
+          <label for="customDelta">Custom rate change (%)</label>
+          <input id="customDelta" type="number" inputmode="decimal" step="0.01" placeholder="0.75" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="calcBtn" class="btn primary">Calculate</button>
+        <button id="resetBtn" class="btn">Reset</button>
+        <span id="status" class="status"></span>
+      </div>
+
+      <div class="results">
+        <div class="resultCard">
+          <div class="k">Baseline monthly payment</div>
+          <div class="v" id="baseMonthly">—</div>
+          <div class="s" id="baseNote"></div>
+        </div>
+        <div class="resultCard">
+          <div class="k">New monthly payment</div>
+          <div class="v" id="newMonthly">—</div>
+          <div class="s" id="deltaMonthly">—</div>
+        </div>
+        <div class="resultCard">
+          <div class="k">Baseline total interest</div>
+          <div class="v" id="baseInterest">—</div>
+          <div class="s" id="baseTotalPaid">—</div>
+        </div>
+        <div class="resultCard">
+          <div class="k">New total interest</div>
+          <div class="v" id="newInterest">—</div>
+          <div class="s" id="deltaInterest">—</div>
+        </div>
+      </div>
+
+      <h2 class="mt">Scenario table</h2>
+      <div class="tableWrap">
+        <table id="scenarioTable">
+          <thead>
+            <tr>
+              <th>Rate change</th>
+              <th>APR</th>
+              <th>Monthly payment</th>
+              <th>Total interest</th>
+              <th>Δ Monthly</th>
+              <th>Δ Interest</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="6" class="muted">Run a calculation to populate scenarios.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="footnote">
+        Educational only. Not financial advice.
+      </div>
+    </section>
+
+    <!-- SCENARIOS -->
+    <section id="scenarios" class="card">
+      <h1>Scenarios</h1>
+      <p class="muted">Click a scenario to auto-fill the calculator.</p>
+
+      <div class="scenarioGrid">
+        <button class="scenario btn" data-scenario="mortgage350">
+          <div class="scenarioTitle">Typical mortgage</div>
+          <div class="scenarioDesc">$350,000 • 30 years • 6.50%</div>
+        </button>
+        <button class="scenario btn" data-scenario="auto25">
+          <div class="scenarioTitle">Auto loan</div>
+          <div class="scenarioDesc">$25,000 • 5 years • 7.90%</div>
+        </button>
+        <button class="scenario btn" data-scenario="student40">
+          <div class="scenarioTitle">Student loan</div>
+          <div class="scenarioDesc">$40,000 • 10 years • 6.00%</div>
+        </button>
+        <button class="scenario btn" data-scenario="cc4k">
+          <div class="scenarioTitle">Credit card payoff</div>
+          <div class="scenarioDesc">$4,000 • 24.00% • $200/mo</div>
+        </button>
+      </div>
+    </section>
+
+    <!-- LEARN -->
+    <section id="learn" class="card">
+      <h1>Learn</h1>
+      <div class="learnGrid">
+        <div class="learnBox">
+          <h3>APR (Annual Percentage Rate)</h3>
+          <p>APR is the yearly interest rate you pay. For monthly calculations, we convert it to a monthly rate (APR ÷ 12).</p>
+        </div>
+        <div class="learnBox">
+          <h3>Why small rate changes matter</h3>
+          <p>On long loans (like 30-year mortgages), even +0.25% can noticeably increase total interest over time.</p>
+        </div>
+        <div class="learnBox">
+          <h3>Monthly vs total interest</h3>
+          <p>A slightly higher monthly payment can translate into thousands more in total interest—RateSense shows both.</p>
+        </div>
+        <div class="learnBox">
+          <h3>Fed rates vs your rate</h3>
+          <p>The Fed influences short-term rates. Your loan rate depends on many factors (credit, term, lender margins), but moves often ripple through.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section id="about" class="card">
+      <h1>About</h1>
+      <p>
+        RateSense is a student-built tool that translates interest-rate changes into real household impacts:
+        monthly payments, payoff timelines, and total interest costs.
+      </p>
+      <p class="muted">
+        Assumptions are simplified for education (fixed-rate amortization; basic credit-card payoff simulation).
+        Not financial advice.
+      </p>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <span class="muted">© RateSense • Built with HTML/CSS/JS • Educational only</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
 
