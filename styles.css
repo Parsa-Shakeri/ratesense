@@ -49,13 +49,13 @@ body{
   border:1px solid var(--line);
   border-radius:18px;
   box-shadow: var(--shadow);
-  padding:18px;
+  padding:20px;
   margin:18px 0;
 }
 
-h1{margin:0 0 10px; font-size:20px}
-h2{margin:12px 0 10px; font-size:14px; color:var(--text)}
-h3{margin:0 0 8px; font-size:14px}
+h1{margin:0 0 10px; font-size:22px; letter-spacing:.2px}
+h2{margin:12px 0 10px; font-size:14px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted)}
+h3{margin:0 0 6px; font-size:14px}
 p{color:var(--text); line-height:1.5; margin:0 0 10px}
 .muted{color:var(--muted)}
 .small{font-size:12px}
@@ -69,7 +69,7 @@ p{color:var(--text); line-height:1.5; margin:0 0 10px}
 
 .layout{
   display:grid;
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: 340px 1fr;
   gap:14px;
   margin-top:10px;
 }
@@ -81,7 +81,7 @@ p{color:var(--text); line-height:1.5; margin:0 0 10px}
   background:#0e1220;
   border:1px solid var(--line);
   border-radius:18px;
-  padding:14px;
+  padding:16px;
 }
 
 .field label{
@@ -95,8 +95,8 @@ p{color:var(--text); line-height:1.5; margin:0 0 10px}
   background:#0b0f1b;
   border:1px solid var(--line);
   color:var(--text);
-  border-radius:12px;
-  padding:11px 12px;
+  border-radius:14px;
+  padding:12px 12px;
   outline:none;
 }
 .field input:focus, .field select:focus{border-color: rgba(110,168,254,.75)}
@@ -151,10 +151,10 @@ p{color:var(--text); line-height:1.5; margin:0 0 10px}
   background:#0b0f1b;
   border:1px solid var(--line);
   border-radius:16px;
-  padding:12px;
+  padding:14px;
 }
 .resultCard .k{color:var(--muted); font-size:12px}
-.resultCard .v{font-size:18px; font-weight:900; margin-top:6px}
+.resultCard .v{font-size:20px; font-weight:900; margin-top:6px}
 .resultCard .s{color:var(--muted); font-size:12px; margin-top:4px}
 
 .twoCol{
@@ -168,7 +168,7 @@ p{color:var(--text); line-height:1.5; margin:0 0 10px}
   background:#0b0f1b;
   border:1px solid var(--line);
   border-radius:16px;
-  padding:12px;
+  padding:14px;
 }
 
 .tableWrap{
@@ -200,10 +200,21 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .refiOut .v{font-weight:900; margin-top:6px}
 .refiOut .s{color:var(--muted); font-size:12px; margin-top:4px}
 
+/* Chart polish */
+.chartBox { padding: 14px; }
 .chartHeader{
   display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
 }
 .chartBtns{display:flex; gap:8px; flex-wrap:wrap}
+.chartCanvasWrap{
+  margin-top: 10px;
+  height: 320px;
+  width: 100%;
+}
+@media (max-width: 720px){
+  .chartCanvasWrap{ height: 260px; }
+}
+canvas { width: 100% !important; height: 100% !important; }
 
 .footnote{margin-top:10px; color:var(--muted); font-size:12px}
 
