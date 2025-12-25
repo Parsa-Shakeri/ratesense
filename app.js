@@ -19,6 +19,26 @@ function shortCurrency(v){
   return String(Math.round(v));
 }
 
+function downloadText(filename, text, mime="text/plain") {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function setParam(url, key, value) {
+  if (value === null || value === undefined || value === "") {
+    url.searchParams.delete(key);
+  } else {
+    url.searchParams.set(key, String(value));
+  }
+}
+
 // ---------- Core Math ----------
 function monthlyPaymentAmortized(principal, aprPercent, years) {
   const P = principal;
@@ -29,7 +49,6 @@ function monthlyPaymentAmortized(principal, aprPercent, years) {
   return P * (r * pow) / (pow - 1);
 }
 
-// Generates a full amortization schedule, supporting extra monthly payment.
 function amortizationSchedule(principal, aprPercent, years, extraMonthly = 0) {
   const P0 = principal;
   const r = (aprPercent / 100) / 12;
@@ -75,7 +94,6 @@ function amortizationSchedule(principal, aprPercent, years, extraMonthly = 0) {
   };
 }
 
-// Credit card payoff simulation
 function creditCardSim(balance, aprPercent, mode, fixedPayment) {
   const monthlyRate = (aprPercent / 100) / 12;
   let b = balance;
@@ -108,7 +126,6 @@ function creditCardSim(balance, aprPercent, mode, fixedPayment) {
   return { months, totalInterest, totalPaid, paidOff };
 }
 
-// Refinance break-even estimate
 function refinanceBreakeven(principal, baseApr, newApr, years, extraMonthly, closingCosts, keepYears) {
   const base = amortizationSchedule(principal, baseApr, years, extraMonthly);
   const refi = amortizationSchedule(principal, newApr, years, extraMonthly);
@@ -136,7 +153,6 @@ function refinanceBreakeven(principal, baseApr, newApr, years, extraMonthly, clo
 
   const baseNet = basePaid + baseRem;
   const refiNet = refiPaid + refiRem + closingCosts;
-
   const netSavings = baseNet - refiNet;
 
   return { breakevenMonth, netSavings };
@@ -167,22 +183,30 @@ const els = {
 
   scenarioTbody: $("scenarioTable").querySelector("tbody"),
 
-  // Refi
   refiNewApr: $("refiNewApr"),
   refiClosingCosts: $("refiClosingCosts"),
   refiKeepYears: $("refiKeepYears"),
   refiBreakeven: $("refiBreakeven"),
   refiSavings: $("refiSavings"),
 
-  // Chart
   chartCanvas: $("chart"),
   chartBalanceBtn: $("chartBalanceBtn"),
   chartSplitBtn: $("chartSplitBtn"),
 
-  // Buttons
+  // New buttons
+  copyBtn: $("copyBtn"),
+  shareBtn: $("shareBtn"),
+  csvBtn: $("csvBtn"),
+  printBtn: $("printBtn"),
+
   calcBtn: $("calcBtn"),
   resetBtn: $("resetBtn"),
-  copyBtn: $("copyBtn"),
+
+  // Report
+  reportDate: $("reportDate"),
+  reportInputs: $("reportInputs"),
+  reportResults: $("reportResults"),
+  reportRefi: $("reportRefi"),
 };
 
 function setStatus(msg) {
@@ -347,17 +371,158 @@ function buildChart(scheduleObj) {
   });
 }
 
+// ---------- Share link (URL params) ----------
+function buildShareURL() {
+  const url = new URL(window.location.href);
+  // keep path, wipe old params
+  url.search = "";
+
+  const loanType = els.loanType.value;
+  setParam(url, "loan", loanType);
+  setParam(url, "p", els.principal.value);
+  setParam(url, "apr", els.apr.value);
+  setParam(url, "delta", els.delta.value);
+  if (els.delta.value === "custom") setParam(url, "cdelta", els.customDelta.value);
+
+  if (loanType !== "creditcard") {
+    setParam(url, "term", els.termYears.value);
+    setParam(url, "extra", els.extraPayment.value || "0");
+    setParam(url, "refiapr", els.refiNewApr.value);
+    setParam(url, "reficost", els.refiClosingCosts.value);
+    setParam(url, "keep", els.refiKeepYears.value);
+  } else {
+    setParam(url, "ccmode", els.ccMode.value);
+    setParam(url, "ccpay", els.ccFixedPayment.value);
+  }
+
+  return url.toString();
+}
+
+function applyParamsFromURL() {
+  const p = new URLSearchParams(window.location.search);
+  if (!p.size) return;
+
+  const loan = p.get("loan");
+  if (loan) els.loanType.value = loan;
+
+  const principal = p.get("p");
+  const apr = p.get("apr");
+  const term = p.get("term");
+  const extra = p.get("extra");
+  const delta = p.get("delta");
+  const cdelta = p.get("cdelta");
+
+  if (principal) els.principal.value = principal;
+  if (apr) els.apr.value = apr;
+
+  if (delta) els.delta.value = delta;
+  els.customDeltaWrap.style.display = (els.delta.value === "custom") ? "" : "none";
+  if (cdelta) els.customDelta.value = cdelta;
+
+  if (els.loanType.value !== "creditcard") {
+    if (term) els.termYears.value = term;
+    if (extra) els.extraPayment.value = extra;
+
+    const refiapr = p.get("refiapr");
+    const reficost = p.get("reficost");
+    const keep = p.get("keep");
+    if (refiapr) els.refiNewApr.value = refiapr;
+    if (reficost) els.refiClosingCosts.value = reficost;
+    if (keep) els.refiKeepYears.value = keep;
+  } else {
+    const ccmode = p.get("ccmode");
+    const ccpay = p.get("ccpay");
+    if (ccmode) els.ccMode.value = ccmode;
+    if (ccpay) els.ccFixedPayment.value = ccpay;
+  }
+
+  showHideFields();
+  setStatus("Loaded from share link. Click Calculate.");
+}
+
+// ---------- CSV Export ----------
+function scheduleToCSV(scheduleObj) {
+  const lines = [];
+  lines.push(["Month","Payment","Interest","Principal","Balance"].join(","));
+
+  let sumPay = 0, sumInt = 0, sumPrin = 0;
+  for (const row of scheduleObj.schedule) {
+    sumPay += row.payment;
+    sumInt += row.interest;
+    sumPrin += row.principal;
+    lines.push([
+      row.month,
+      row.payment.toFixed(2),
+      row.interest.toFixed(2),
+      row.principal.toFixed(2),
+      row.balance.toFixed(2)
+    ].join(","));
+  }
+
+  lines.push("");
+  lines.push(["Totals", sumPay.toFixed(2), sumInt.toFixed(2), sumPrin.toFixed(2), ""].join(","));
+  return lines.join("\n");
+}
+
+// ---------- Print report ----------
+function updateReportBlocks() {
+  const now = new Date();
+  els.reportDate.textContent = `Generated: ${now.toLocaleString()}`;
+
+  // Inputs
+  const loanType = els.loanType.value;
+  const delta = getDelta();
+  const inputLines = [];
+
+  inputLines.push(`Loan type: ${loanType}`);
+  inputLines.push(`Principal/balance: ${fmtUSD2(parseFloat(els.principal.value))}`);
+  inputLines.push(`APR: ${parseFloat(els.apr.value).toFixed(2)}%`);
+  inputLines.push(`Rate scenario: +${delta.toFixed(2)}%`);
+
+  if (loanType !== "creditcard") {
+    inputLines.push(`Term: ${parseFloat(els.termYears.value)} years`);
+    inputLines.push(`Extra payment: ${fmtUSD2(parseFloat(els.extraPayment.value || "0") || 0)}`);
+  } else {
+    inputLines.push(`CC mode: ${els.ccMode.value}`);
+    if (els.ccMode.value === "fixed") inputLines.push(`Fixed payment: ${fmtUSD2(parseFloat(els.ccFixedPayment.value))}`);
+  }
+
+  els.reportInputs.textContent = inputLines.join("\n");
+
+  // Results (pull from UI text)
+  const resultsLines = [];
+  resultsLines.push(`Baseline monthly: ${els.baseMonthly.textContent}`);
+  resultsLines.push(`${els.baseNote.textContent || ""}`.trim());
+  resultsLines.push(`Baseline interest: ${els.baseInterest.textContent}`);
+  resultsLines.push(`${els.baseTotalPaid.textContent || ""}`.trim());
+  resultsLines.push("");
+  resultsLines.push(`Scenario monthly: ${els.newMonthly.textContent}`);
+  resultsLines.push(`Δ monthly: ${els.deltaMonthly.textContent}`);
+  resultsLines.push(`Scenario interest: ${els.newInterest.textContent}`);
+  resultsLines.push(`Δ interest: ${els.deltaInterest.textContent}`);
+
+  els.reportResults.textContent = resultsLines.filter(Boolean).join("\n");
+
+  // Refi
+  const refiLines = [];
+  refiLines.push(`New APR: ${els.refiNewApr.value || "—"}`);
+  refiLines.push(`Closing costs: ${els.refiClosingCosts.value ? fmtUSD2(parseFloat(els.refiClosingCosts.value)) : "—"}`);
+  refiLines.push(`Keep years: ${els.refiKeepYears.value || "—"}`);
+  refiLines.push(`Break-even: ${els.refiBreakeven.textContent}`);
+  refiLines.push(`Savings: ${els.refiSavings.textContent}`);
+
+  els.reportRefi.textContent = refiLines.join("\n");
+}
+
 // ---------- Copy summary ----------
 let lastSummary = "";
 let lastBaselineSchedule = null;
 
 function copySummary(text) {
   navigator.clipboard.writeText(text).then(() => {
-    setStatus("Copied summary.");
+    setStatus("Copied.");
     setTimeout(() => setStatus(""), 1500);
-  }).catch(() => {
-    setStatus("Copy failed (clipboard blocked).");
-  });
+  }).catch(() => setStatus("Copy failed (clipboard blocked)."));
 }
 
 // ---------- Main Calculation ----------
@@ -391,12 +556,11 @@ function calculateAndRender() {
 
     renderScenarioTableCC(principal, apr, mode, fixed);
 
-    // Chart not shown for CC in this version
     if (chart) { chart.destroy(); chart = null; }
     lastBaselineSchedule = null;
 
     els.refiBreakeven.textContent = "—";
-    els.refiSavings.textContent = "Refinance model applies to amortized loans only.";
+    els.refiSavings.textContent = "Refinance applies to amortized loans only.";
 
     lastSummary =
       `RateSense summary (Credit Card)\n` +
@@ -405,6 +569,8 @@ function calculateAndRender() {
       `New payoff: ${next.months} months, total interest ${fmtUSD2(next.totalInterest)}\n` +
       `Δ interest: ${fmtUSD2(next.totalInterest - base.totalInterest)}\n` +
       `Educational only; not financial advice.`;
+
+    updateReportBlocks();
     return;
   }
 
@@ -430,18 +596,16 @@ function calculateAndRender() {
   const dI = newSched.totalInterest - baseSched.totalInterest;
   els.deltaInterest.textContent = `${dI >= 0 ? "+" : ""}${fmtUSD2(dI)} interest`;
 
-  // Chart uses baseline schedule
   lastBaselineSchedule = baseSched;
   buildChart(baseSched);
 
-  // Refi (optional inputs)
+  // Refi
   const refiApr = parseFloat(els.refiNewApr.value);
   const closingCosts = parseFloat(els.refiClosingCosts.value);
   const keepYears = parseFloat(els.refiKeepYears.value);
 
   if (isFinite(refiApr) && isFinite(closingCosts) && closingCosts >= 0 && isFinite(keepYears) && keepYears > 0) {
     const r = refinanceBreakeven(principal, apr, refiApr, years, extra, closingCosts, keepYears);
-
     if (r.breakevenMonth === null) {
       els.refiBreakeven.textContent = "No break-even within keep period";
     } else {
@@ -457,10 +621,12 @@ function calculateAndRender() {
     `RateSense summary (${loanType})\n` +
     `Principal: ${fmtUSD2(principal)}\nTerm: ${years} years\nAPR baseline: ${apr.toFixed(2)}%\nExtra monthly payment: ${fmtUSD2(extra)}\n` +
     `Scenario: +${delta.toFixed(2)}% => APR ${(aprNew).toFixed(2)}%\n\n` +
-    `Baseline monthly payment: ${fmtUSD2(baseMonthly)}\nBaseline payoff: ${baseSched.months} months\nBaseline total interest: ${fmtUSD2(baseSched.totalInterest)}\n\n` +
-    `Scenario monthly payment: ${fmtUSD2(newMonthly)}\nScenario total interest: ${fmtUSD2(newSched.totalInterest)}\n` +
+    `Baseline monthly: ${fmtUSD2(baseMonthly)}\nBaseline payoff: ${baseSched.months} months\nBaseline interest: ${fmtUSD2(baseSched.totalInterest)}\n\n` +
+    `Scenario monthly: ${fmtUSD2(newMonthly)}\nScenario interest: ${fmtUSD2(newSched.totalInterest)}\n` +
     `Δ monthly: ${fmtUSD2(dM)}\nΔ interest: ${fmtUSD2(dI)}\n\n` +
     `Educational only; not financial advice.`;
+
+  updateReportBlocks();
 }
 
 // ---------- Reset ----------
@@ -498,6 +664,7 @@ function resetAll() {
   lastSummary = "";
   lastBaselineSchedule = null;
 
+  updateReportBlocks();
   setStatus("");
   showHideFields();
 }
@@ -537,19 +704,40 @@ function loadScenario(key) {
 els.loanType.addEventListener("change", showHideFields);
 
 els.delta.addEventListener("change", () => {
-  const isCustom = els.delta.value === "custom";
-  els.customDeltaWrap.style.display = isCustom ? "" : "none";
+  els.customDeltaWrap.style.display = (els.delta.value === "custom") ? "" : "none";
 });
 
 els.calcBtn.addEventListener("click", calculateAndRender);
 els.resetBtn.addEventListener("click", resetAll);
 
 els.copyBtn.addEventListener("click", () => {
-  if (!lastSummary) {
-    setStatus("Run a calculation first, then copy.");
+  if (!lastSummary) return setStatus("Run a calculation first.");
+  copySummary(lastSummary);
+});
+
+els.shareBtn.addEventListener("click", () => {
+  const link = buildShareURL();
+  navigator.clipboard.writeText(link).then(() => {
+    setStatus("Share link copied.");
+    setTimeout(() => setStatus(""), 1500);
+  }).catch(() => setStatus("Copy failed (clipboard blocked)."));
+});
+
+els.csvBtn.addEventListener("click", () => {
+  if (!lastBaselineSchedule?.schedule?.length) {
+    setStatus("Run an amortized loan calc first (mortgage/auto/student).");
     return;
   }
-  copySummary(lastSummary);
+  const csv = scheduleToCSV(lastBaselineSchedule);
+  downloadText("ratesense_schedule.csv", csv, "text/csv");
+  setStatus("CSV downloaded.");
+  setTimeout(() => setStatus(""), 1500);
+});
+
+els.printBtn.addEventListener("click", () => {
+  if (!lastSummary) setStatus("Tip: run a calculation first for a complete report.");
+  updateReportBlocks();
+  window.print();
 });
 
 els.chartBalanceBtn.addEventListener("click", () => {
@@ -566,4 +754,5 @@ document.querySelectorAll("[data-scenario]").forEach(btn => {
 });
 
 // init
+applyParamsFromURL();
 resetAll();
