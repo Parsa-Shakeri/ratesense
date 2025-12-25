@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>RateSense</title>
   <link rel="stylesheet" href="styles.css" />
-  <!-- Chart.js for professional charts -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -15,7 +15,7 @@
       <div class="logo">RS</div>
       <div>
         <div class="title">RateSense</div>
-        <div class="subtitle">Turn rate headlines into real payment impacts — with schedules, charts, and break-even.</div>
+        <div class="subtitle">Turn rate headlines into real monthly payment impacts.</div>
       </div>
     </div>
 
@@ -33,7 +33,7 @@
       <div class="topRow">
         <div>
           <h1>Calculator</h1>
-          <p class="muted">Model payments, total interest, payoff time, and how changes in rates affect your costs.</p>
+          <p class="muted">Model payments, total interest, payoff time, extra payments, and refinance break-even.</p>
         </div>
         <div class="topActions">
           <button id="copyBtn" class="btn">Copy summary</button>
@@ -69,7 +69,7 @@
           <div class="field">
             <label for="apr">APR (%)</label>
             <input id="apr" type="number" inputmode="decimal" min="0" step="0.01" placeholder="6.50" />
-            <div class="hint">APR is the annual interest rate. We convert it to a monthly rate (APR ÷ 12).</div>
+            <div class="hint">APR is annual interest. We convert to monthly (APR ÷ 12).</div>
           </div>
 
           <div class="field amortizedOnly">
@@ -189,7 +189,7 @@
               <div class="field">
                 <label for="refiKeepYears">How long will you keep the loan? (years)</label>
                 <input id="refiKeepYears" type="number" inputmode="decimal" step="0.5" placeholder="5" />
-                <div class="hint">Used to estimate total savings while you keep the loan.</div>
+                <div class="hint">Estimates net savings over that time horizon.</div>
               </div>
 
               <div class="refiOut">
@@ -200,16 +200,21 @@
             </div>
           </div>
 
-          <div class="box mt">
+          <div class="box mt chartBox">
             <div class="chartHeader">
-              <h3>Balance & payment composition</h3>
+              <div>
+                <h3>Charts</h3>
+                <div class="muted small">Baseline schedule (includes extra payments if set).</div>
+              </div>
               <div class="chartBtns">
                 <button class="btn smallBtn" id="chartBalanceBtn">Balance</button>
                 <button class="btn smallBtn" id="chartSplitBtn">Principal vs Interest</button>
               </div>
             </div>
-            <canvas id="chart" height="120"></canvas>
-            <div class="muted small">Chart uses the baseline schedule (with extra payment if provided).</div>
+
+            <div class="chartCanvasWrap">
+              <canvas id="chart"></canvas>
+            </div>
           </div>
 
           <details class="assumptions mt">
