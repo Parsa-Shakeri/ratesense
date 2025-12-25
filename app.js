@@ -4,10 +4,6 @@
 // ---------- Helpers ----------
 const $ = (id) => document.getElementById(id);
 
-function fmtUSD(x) {
-  if (!isFinite(x)) return "—";
-  return x.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-}
 function fmtUSD2(x) {
   if (!isFinite(x)) return "—";
   return x.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
@@ -15,6 +11,12 @@ function fmtUSD2(x) {
 function fmtPct(x) {
   if (!isFinite(x)) return "—";
   return (x * 100).toFixed(2) + "%";
+}
+function shortCurrency(v){
+  const abs = Math.abs(v);
+  if (abs >= 1_000_000) return (v/1_000_000).toFixed(1) + "M";
+  if (abs >= 1_000) return (v/1_000).toFixed(0) + "k";
+  return String(Math.round(v));
 }
 
 // ---------- Core Math ----------
@@ -28,13 +30,9 @@ function monthlyPaymentAmortized(principal, aprPercent, years) {
 }
 
 // Generates a full amortization schedule, supporting extra monthly payment.
-// Returns { schedule: [{month, payment, interest, principal, balance}], totalInterest, totalPaid, months, monthlyPaymentBase }
-// monthlyPaymentBase is the standard amortized payment (without extra) used as baseline payment amount.
 function amortizationSchedule(principal, aprPercent, years, extraMonthly = 0) {
   const P0 = principal;
   const r = (aprPercent / 100) / 12;
-  const n = Math.round(years * 12);
-
   const baseMonthly = monthlyPaymentAmortized(P0, aprPercent, years);
   const extra = Math.max(0, extraMonthly || 0);
 
@@ -44,13 +42,12 @@ function amortizationSchedule(principal, aprPercent, years, extraMonthly = 0) {
   let month = 0;
 
   const schedule = [];
-  const MAX_MONTHS = 1200; // safety
+  const MAX_MONTHS = 1200;
 
   while (balance > 0.01 && month < MAX_MONTHS) {
     month += 1;
     const interest = (r === 0) ? 0 : balance * r;
 
-    // Standard payment + extra, but never more than balance+interest
     let payment = baseMonthly + extra;
     payment = Math.min(payment, balance + interest);
 
@@ -67,11 +64,6 @@ function amortizationSchedule(principal, aprPercent, years, extraMonthly = 0) {
       principal: principalPaid,
       balance: Math.max(0, balance),
     });
-
-    // If original term reached and we still have balance (can happen if payment too low due to r edge cases)
-    if (month >= n && extra === 0) {
-      // continue using same payment until done
-    }
   }
 
   return {
@@ -79,12 +71,11 @@ function amortizationSchedule(principal, aprPercent, years, extraMonthly = 0) {
     totalInterest,
     totalPaid,
     months: schedule.length,
-    monthlyPaymentBase: baseMonthly,
+    monthlyPaymentBase: schedule[0]?.payment ?? NaN,
   };
 }
 
 // Credit card payoff simulation
-// mode = "minimum" or "fixed"
 function creditCardSim(balance, aprPercent, mode, fixedPayment) {
   const monthlyRate = (aprPercent / 100) / 12;
   let b = balance;
@@ -117,17 +108,7 @@ function creditCardSim(balance, aprPercent, mode, fixedPayment) {
   return { months, totalInterest, totalPaid, paidOff };
 }
 
-// Estimate remaining balance after k months using schedule
-function remainingAfterMonths(scheduleObj, k) {
-  const idx = Math.min(k, scheduleObj.schedule.length) - 1;
-  if (idx < 0) return scheduleObj.schedule[0]?.balance ?? NaN;
-  return scheduleObj.schedule[idx].balance;
-}
-
-// Refinance break-even:
-// - Compare baseline schedule vs refi schedule using same principal and term (years)
-// - Use monthly savings at month 1 (approx) and cumulative savings over keep period.
-// - Break-even: earliest month where cumulative payment savings >= closing costs.
+// Refinance break-even estimate
 function refinanceBreakeven(principal, baseApr, newApr, years, extraMonthly, closingCosts, keepYears) {
   const base = amortizationSchedule(principal, baseApr, years, extraMonthly);
   const refi = amortizationSchedule(principal, newApr, years, extraMonthly);
@@ -148,21 +129,17 @@ function refinanceBreakeven(principal, baseApr, newApr, years, extraMonthly, clo
     }
   }
 
-  // Total savings over keep period (payments + remaining balance difference)
-  // A more serious estimate: savings = (sum payments) + (remaining balance difference)
   const basePaid = base.schedule.slice(0, keepMonths).reduce((s, x) => s + x.payment, 0);
   const refiPaid = refi.schedule.slice(0, keepMonths).reduce((s, x) => s + x.payment, 0);
   const baseRem = base.schedule[Math.min(keepMonths, base.schedule.length) - 1]?.balance ?? 0;
   const refiRem = refi.schedule[Math.min(keepMonths, refi.schedule.length) - 1]?.balance ?? 0;
 
-  // If you keep the loan for keepMonths, your "net cost" is payments + remaining balance outstanding.
-  // Lower net cost = better.
   const baseNet = basePaid + baseRem;
   const refiNet = refiPaid + refiRem + closingCosts;
 
   const netSavings = baseNet - refiNet;
 
-  return { breakevenMonth, netSavings, baseMonthly: base.schedule[0]?.payment ?? NaN, refiMonthly: refi.schedule[0]?.payment ?? NaN };
+  return { breakevenMonth, netSavings };
 }
 
 // ---------- UI Elements ----------
@@ -244,23 +221,22 @@ function validateInputs() {
       if (!(fp > 0)) return { ok: false, msg: "Enter a fixed payment > 0." };
     }
   }
-
   return { ok: true };
 }
 
-// ---------- Rendering ----------
+// ---------- Scenario Tables ----------
 function renderScenarioTableAmortized(baseApr, principal, years, extra) {
   els.scenarioTbody.innerHTML = "";
   const deltas = [0, 0.25, 0.50, 1.00];
 
   const baseSched = amortizationSchedule(principal, baseApr, years, extra);
-  const baseMonthly = baseSched.schedule[0]?.payment ?? NaN;
+  const baseMonthly = baseSched.monthlyPaymentBase;
   const baseInterest = baseSched.totalInterest;
 
   deltas.forEach((d, idx) => {
     const apr = baseApr + d;
     const s = amortizationSchedule(principal, apr, years, extra);
-    const monthly = s.schedule[0]?.payment ?? NaN;
+    const monthly = s.monthlyPaymentBase;
     const interest = s.totalInterest;
 
     const tr = document.createElement("tr");
@@ -303,30 +279,48 @@ function renderScenarioTableCC(balance, baseApr, mode, fixedPayment) {
 let chart = null;
 let chartMode = "balance"; // "balance" or "split"
 
+function downsampleSchedule(schedule, maxPoints = 140){
+  if (schedule.length <= maxPoints) return schedule;
+  const step = Math.ceil(schedule.length / maxPoints);
+  const out = [];
+  for (let i=0; i<schedule.length; i+=step) out.push(schedule[i]);
+  if (out[out.length-1] !== schedule[schedule.length-1]) out.push(schedule[schedule.length-1]);
+  return out;
+}
+
 function buildChart(scheduleObj) {
   if (!scheduleObj?.schedule?.length) return;
 
-  const labels = scheduleObj.schedule.map(x => x.month);
-  const balances = scheduleObj.schedule.map(x => x.balance);
-  const interest = scheduleObj.schedule.map(x => x.interest);
-  const principal = scheduleObj.schedule.map(x => x.principal);
+  const s = downsampleSchedule(scheduleObj.schedule, 140);
+  const labels = s.map(x => x.month);
+  const bal = s.map(x => x.balance);
+  const intP = s.map(x => x.interest);
+  const prinP = s.map(x => x.principal);
 
-  const data = (chartMode === "balance")
+  const isBalance = (chartMode === "balance");
+
+  const data = isBalance
     ? {
         labels,
-        datasets: [
-          { label: "Remaining balance ($)", data: balances }
-        ]
+        datasets: [{
+          label: "Remaining balance",
+          data: bal,
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.25,
+          fill: true
+        }]
       }
     : {
         labels,
         datasets: [
-          { label: "Interest portion ($)", data: interest },
-          { label: "Principal portion ($)", data: principal },
+          { label: "Interest portion (monthly)", data: intP, borderWidth: 2, pointRadius: 0, tension: 0.25 },
+          { label: "Principal portion (monthly)", data: prinP, borderWidth: 2, pointRadius: 0, tension: 0.25 }
         ]
       };
 
   if (chart) chart.destroy();
+
   chart = new Chart(els.chartCanvas, {
     type: "line",
     data,
@@ -334,32 +328,39 @@ function buildChart(scheduleObj) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: true },
-        tooltip: { mode: "index", intersect: false }
+        legend: { display: true, labels: { boxWidth: 12 } },
+        tooltip: {
+          mode: "index",
+          intersect: false,
+          callbacks: {
+            title: (items) => `Month ${items[0].label}`,
+            label: (item) => `${item.dataset.label}: $${item.raw.toLocaleString(undefined, {maximumFractionDigits: 0})}`
+          }
+        }
       },
       interaction: { mode: "index", intersect: false },
       scales: {
-        x: { title: { display: true, text: "Month" } },
-        y: { title: { display: true, text: "Dollars ($)" } }
+        x: { title: { display: true, text: "Month" }, ticks: { maxTicksLimit: 10 } },
+        y: { title: { display: true, text: "Dollars ($)" }, ticks: { callback: (v) => "$" + shortCurrency(v) } }
       }
     }
   });
 }
 
 // ---------- Copy summary ----------
+let lastSummary = "";
+let lastBaselineSchedule = null;
+
 function copySummary(text) {
   navigator.clipboard.writeText(text).then(() => {
     setStatus("Copied summary.");
     setTimeout(() => setStatus(""), 1500);
   }).catch(() => {
-    setStatus("Copy failed. Your browser may block clipboard access.");
+    setStatus("Copy failed (clipboard blocked).");
   });
 }
 
 // ---------- Main Calculation ----------
-let lastSummary = "";
-let lastBaselineSchedule = null;
-
 function calculateAndRender() {
   const v = validateInputs();
   if (!v.ok) { setStatus(v.msg); return; }
@@ -371,19 +372,13 @@ function calculateAndRender() {
   const delta = getDelta();
   const aprNew = apr + delta;
 
-  // Reset refi outputs if CC
-  if (loanType === "creditcard") {
-    els.refiBreakeven.textContent = "—";
-    els.refiSavings.textContent = "—";
-  }
-
   if (loanType === "creditcard") {
     const mode = els.ccMode.value;
     const fixed = parseFloat(els.ccFixedPayment.value);
+
     const base = creditCardSim(principal, apr, mode, fixed);
     const next = creditCardSim(principal, aprNew, mode, fixed);
 
-    // Results (credit)
     els.baseMonthly.textContent = "—";
     els.newMonthly.textContent = "—";
     els.baseNote.textContent = `Baseline payoff time: ${base.months} months${base.paidOff ? "" : " (may not fully pay off)"}`;
@@ -396,8 +391,12 @@ function calculateAndRender() {
 
     renderScenarioTableCC(principal, apr, mode, fixed);
 
-    // Chart: for CC, we won't chart (optional later)
+    // Chart not shown for CC in this version
     if (chart) { chart.destroy(); chart = null; }
+    lastBaselineSchedule = null;
+
+    els.refiBreakeven.textContent = "—";
+    els.refiSavings.textContent = "Refinance model applies to amortized loans only.";
 
     lastSummary =
       `RateSense summary (Credit Card)\n` +
@@ -412,13 +411,11 @@ function calculateAndRender() {
   const years = parseFloat(els.termYears.value);
   const extra = parseFloat(els.extraPayment.value || "0") || 0;
 
-  // Baseline schedule includes extra payment (serious feature)
   const baseSched = renderScenarioTableAmortized(apr, principal, years, extra);
-  const baseMonthly = baseSched.schedule[0]?.payment ?? NaN;
-
-  // New schedule for chosen delta
   const newSched = amortizationSchedule(principal, aprNew, years, extra);
-  const newMonthly = newSched.schedule[0]?.payment ?? NaN;
+
+  const baseMonthly = baseSched.monthlyPaymentBase;
+  const newMonthly = newSched.monthlyPaymentBase;
 
   els.baseMonthly.textContent = fmtUSD2(baseMonthly);
   els.baseNote.textContent = `Payoff: ${baseSched.months} months${extra > 0 ? " (with extra payment)" : ""}`;
@@ -433,142 +430,14 @@ function calculateAndRender() {
   const dI = newSched.totalInterest - baseSched.totalInterest;
   els.deltaInterest.textContent = `${dI >= 0 ? "+" : ""}${fmtUSD2(dI)} interest`;
 
-  // Build baseline chart
+  // Chart uses baseline schedule
   lastBaselineSchedule = baseSched;
   buildChart(baseSched);
 
-  // Refinance break-even (if user provided)
+  // Refi (optional inputs)
   const refiApr = parseFloat(els.refiNewApr.value);
   const closingCosts = parseFloat(els.refiClosingCosts.value);
   const keepYears = parseFloat(els.refiKeepYears.value);
 
   if (isFinite(refiApr) && isFinite(closingCosts) && closingCosts >= 0 && isFinite(keepYears) && keepYears > 0) {
-    const r = refinanceBreakeven(principal, apr, refiApr, years, extra, closingCosts, keepYears);
-    if (r.breakevenMonth === null) {
-      els.refiBreakeven.textContent = "No break-even within keep period";
-    } else {
-      const yrs = (r.breakevenMonth / 12);
-      els.refiBreakeven.textContent = `${r.breakevenMonth} months (~${yrs.toFixed(1)} years)`;
-    }
-    els.refiSavings.textContent = `Estimated net savings over ${keepYears} years: ${fmtUSD2(r.netSavings)} (after closing costs)`;
-  } else {
-    els.refiBreakeven.textContent = "—";
-    els.refiSavings.textContent = "Enter new APR, closing costs, and keep years.";
-  }
-
-  // Summary text for export
-  lastSummary =
-    `RateSense summary (${els.loanType.value})\n` +
-    `Principal: ${fmtUSD2(principal)}\nTerm: ${years} years\nAPR baseline: ${apr.toFixed(2)}%\nExtra monthly payment: ${fmtUSD2(extra)}\n` +
-    `Scenario: +${delta.toFixed(2)}% => APR ${(aprNew).toFixed(2)}%\n\n` +
-    `Baseline monthly payment: ${fmtUSD2(baseMonthly)}\nBaseline payoff: ${baseSched.months} months\nBaseline total interest: ${fmtUSD2(baseSched.totalInterest)}\n\n` +
-    `Scenario monthly payment: ${fmtUSD2(newMonthly)}\nScenario total interest: ${fmtUSD2(newSched.totalInterest)}\n` +
-    `Δ monthly: ${fmtUSD2(dM)}\nΔ interest: ${fmtUSD2(dI)}\n\n` +
-    `Educational only; not financial advice.`;
-}
-
-// ---------- Reset ----------
-function resetAll() {
-  els.loanType.value = "mortgage";
-  els.principal.value = "";
-  els.termYears.value = "";
-  els.apr.value = "";
-  els.extraPayment.value = "0";
-  els.delta.value = "0";
-  els.customDelta.value = "";
-  els.customDeltaWrap.style.display = "none";
-  els.ccMode.value = "minimum";
-  els.ccFixedPayment.value = "";
-
-  // Refi defaults empty
-  els.refiNewApr.value = "";
-  els.refiClosingCosts.value = "";
-  els.refiKeepYears.value = "";
-
-  els.baseMonthly.textContent = "—";
-  els.newMonthly.textContent = "—";
-  els.deltaMonthly.textContent = "—";
-  els.baseInterest.textContent = "—";
-  els.newInterest.textContent = "—";
-  els.deltaInterest.textContent = "—";
-  els.baseTotalPaid.textContent = "—";
-  els.baseNote.textContent = "";
-
-  els.refiBreakeven.textContent = "—";
-  els.refiSavings.textContent = "—";
-
-  els.scenarioTbody.innerHTML = `<tr><td colspan="6" class="muted">Run a calculation to populate scenarios.</td></tr>`;
-
-  if (chart) { chart.destroy(); chart = null; }
-  lastSummary = "";
-  lastBaselineSchedule = null;
-
-  setStatus("");
-  showHideFields();
-}
-
-// ---------- Scenario Loader ----------
-const scenarios = {
-  mortgage350: { loanType: "mortgage", principal: 350000, years: 30, apr: 6.5, extra: 0 },
-  auto25: { loanType: "auto", principal: 25000, years: 5, apr: 7.9, extra: 0 },
-  student40: { loanType: "student", principal: 40000, years: 10, apr: 6.0, extra: 0 },
-  cc4k: { loanType: "creditcard", principal: 4000, apr: 24.0, ccMode: "fixed", ccFixedPayment: 200 },
-};
-
-function loadScenario(key) {
-  const s = scenarios[key];
-  if (!s) return;
-
-  els.loanType.value = s.loanType;
-  els.principal.value = s.principal;
-  els.apr.value = s.apr;
-
-  if (s.loanType === "creditcard") {
-    els.ccMode.value = s.ccMode || "minimum";
-    els.ccFixedPayment.value = s.ccFixedPayment ?? "";
-  } else {
-    els.termYears.value = s.years;
-    els.extraPayment.value = String(s.extra ?? 0);
-  }
-
-  els.delta.value = "0";
-  els.customDeltaWrap.style.display = "none";
-  showHideFields();
-  setStatus("Scenario loaded. Click Calculate.");
-  window.location.hash = "#calculator";
-}
-
-// ---------- Event Wiring ----------
-els.loanType.addEventListener("change", showHideFields);
-
-els.delta.addEventListener("change", () => {
-  const isCustom = els.delta.value === "custom";
-  els.customDeltaWrap.style.display = isCustom ? "" : "none";
-});
-
-els.calcBtn.addEventListener("click", calculateAndRender);
-els.resetBtn.addEventListener("click", resetAll);
-
-els.copyBtn.addEventListener("click", () => {
-  if (!lastSummary) {
-    setStatus("Run a calculation first, then copy.");
-    return;
-  }
-  copySummary(lastSummary);
-});
-
-els.chartBalanceBtn.addEventListener("click", () => {
-  chartMode = "balance";
-  if (lastBaselineSchedule) buildChart(lastBaselineSchedule);
-});
-els.chartSplitBtn.addEventListener("click", () => {
-  chartMode = "split";
-  if (lastBaselineSchedule) buildChart(lastBaselineSchedule);
-});
-
-document.querySelectorAll("[data-scenario]").forEach(btn => {
-  btn.addEventListener("click", () => loadScenario(btn.dataset.scenario));
-});
-
-// init
-resetAll();
+    const r = refinanceBreakeven(principa
