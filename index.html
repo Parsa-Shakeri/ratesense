@@ -6,11 +6,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>RateSense</title>
   <link rel="stylesheet" href="styles.css" />
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <header class="wrap header">
+  <header class="wrap header no-print">
     <div class="brand">
       <div class="logo">RS</div>
       <div>
@@ -33,17 +32,21 @@
       <div class="topRow">
         <div>
           <h1>Calculator</h1>
-          <p class="muted">Model payments, total interest, payoff time, extra payments, and refinance break-even.</p>
+          <p class="muted">Payments, total interest, extra payments, refinance break-even, charts, and exports.</p>
         </div>
-        <div class="topActions">
+
+        <div class="topActions no-print">
           <button id="copyBtn" class="btn">Copy summary</button>
+          <button id="shareBtn" class="btn">Copy share link</button>
+          <button id="csvBtn" class="btn">Download CSV</button>
+          <button id="printBtn" class="btn">Print report</button>
           <span id="status" class="status"></span>
         </div>
       </div>
 
       <div class="layout">
         <!-- LEFT: Inputs -->
-        <aside class="panel">
+        <aside class="panel no-print">
           <h2>Inputs</h2>
 
           <div class="field">
@@ -72,229 +75,4 @@
             <div class="hint">APR is annual interest. We convert to monthly (APR ÷ 12).</div>
           </div>
 
-          <div class="field amortizedOnly">
-            <label for="extraPayment">Extra monthly payment ($)</label>
-            <input id="extraPayment" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
-            <div class="hint">Optional. Extra payment reduces payoff time and total interest.</div>
-          </div>
-
-          <div class="field">
-            <label for="delta">Rate change scenario</label>
-            <select id="delta">
-              <option value="0">No change</option>
-              <option value="0.25">+0.25%</option>
-              <option value="0.50">+0.50%</option>
-              <option value="1.00">+1.00%</option>
-              <option value="custom">Custom…</option>
-            </select>
-          </div>
-
-          <div class="field" id="customDeltaWrap" style="display:none;">
-            <label for="customDelta">Custom rate change (%)</label>
-            <input id="customDelta" type="number" inputmode="decimal" step="0.01" placeholder="0.75" />
-          </div>
-
-          <!-- Credit card-only inputs -->
-          <div class="field creditOnly">
-            <label for="ccMode">Credit card payment mode</label>
-            <select id="ccMode">
-              <option value="minimum">Minimum payment (2% or $25)</option>
-              <option value="fixed">Fixed monthly payment</option>
-            </select>
-          </div>
-
-          <div class="field creditOnly">
-            <label for="ccFixedPayment">Fixed payment ($)</label>
-            <input id="ccFixedPayment" type="number" inputmode="decimal" min="0" placeholder="200" />
-            <div class="hint">Used only if mode = Fixed monthly payment.</div>
-          </div>
-
-          <div class="actions">
-            <button id="calcBtn" class="btn primary">Calculate</button>
-            <button id="resetBtn" class="btn">Reset</button>
-          </div>
-
-          <details class="assumptions">
-            <summary>Model assumptions</summary>
-            <ul>
-              <li>Fixed-rate amortization (no taxes/insurance/fees unless you add them externally).</li>
-              <li>Extra payments are applied monthly and reduce principal.</li>
-              <li>Credit card payoff uses a simplified month-by-month simulation.</li>
-              <li>Educational only — not financial advice.</li>
-            </ul>
-          </details>
-        </aside>
-
-        <!-- RIGHT: Outputs -->
-        <section class="panel">
-          <h2>Results</h2>
-
-          <div class="results">
-            <div class="resultCard">
-              <div class="k">Baseline monthly payment</div>
-              <div class="v" id="baseMonthly">—</div>
-              <div class="s" id="baseNote"></div>
-            </div>
-            <div class="resultCard">
-              <div class="k">New monthly payment</div>
-              <div class="v" id="newMonthly">—</div>
-              <div class="s" id="deltaMonthly">—</div>
-            </div>
-            <div class="resultCard">
-              <div class="k">Baseline total interest</div>
-              <div class="v" id="baseInterest">—</div>
-              <div class="s" id="baseTotalPaid">—</div>
-            </div>
-            <div class="resultCard">
-              <div class="k">New total interest</div>
-              <div class="v" id="newInterest">—</div>
-              <div class="s" id="deltaInterest">—</div>
-            </div>
-          </div>
-
-          <div class="twoCol mt">
-            <div class="box">
-              <h3>Scenario table</h3>
-              <div class="tableWrap">
-                <table id="scenarioTable">
-                  <thead>
-                    <tr>
-                      <th>Rate change</th>
-                      <th>APR</th>
-                      <th>Monthly payment</th>
-                      <th>Total interest</th>
-                      <th>Δ Monthly</th>
-                      <th>Δ Interest</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr><td colspan="6" class="muted">Run a calculation to populate scenarios.</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="box">
-              <h3>Refinance break-even</h3>
-              <p class="muted small">For amortized loans only (mortgage/auto/student).</p>
-
-              <div class="field">
-                <label for="refiNewApr">New APR (%)</label>
-                <input id="refiNewApr" type="number" inputmode="decimal" step="0.01" placeholder="5.75" />
-              </div>
-              <div class="field">
-                <label for="refiClosingCosts">Closing costs ($)</label>
-                <input id="refiClosingCosts" type="number" inputmode="decimal" step="1" placeholder="3000" />
-              </div>
-              <div class="field">
-                <label for="refiKeepYears">How long will you keep the loan? (years)</label>
-                <input id="refiKeepYears" type="number" inputmode="decimal" step="0.5" placeholder="5" />
-                <div class="hint">Estimates net savings over that time horizon.</div>
-              </div>
-
-              <div class="refiOut">
-                <div class="k">Break-even time</div>
-                <div class="v" id="refiBreakeven">—</div>
-                <div class="s" id="refiSavings">—</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="box mt chartBox">
-            <div class="chartHeader">
-              <div>
-                <h3>Charts</h3>
-                <div class="muted small">Baseline schedule (includes extra payments if set).</div>
-              </div>
-              <div class="chartBtns">
-                <button class="btn smallBtn" id="chartBalanceBtn">Balance</button>
-                <button class="btn smallBtn" id="chartSplitBtn">Principal vs Interest</button>
-              </div>
-            </div>
-
-            <div class="chartCanvasWrap">
-              <canvas id="chart"></canvas>
-            </div>
-          </div>
-
-          <details class="assumptions mt">
-            <summary>Disclosure</summary>
-            <p class="muted small">
-              RateSense is an educational calculator. Real loans include fees, compounding conventions, taxes/insurance (mortgages),
-              and variable-rate terms. Always verify with your lender.
-            </p>
-          </details>
-
-          <div class="footnote">Educational only. Not financial advice.</div>
-        </section>
-      </div>
-    </section>
-
-    <!-- SCENARIOS -->
-    <section id="scenarios" class="card">
-      <h1>Scenarios</h1>
-      <p class="muted">Click a scenario to auto-fill inputs.</p>
-
-      <div class="scenarioGrid">
-        <button class="scenario btn" data-scenario="mortgage350">
-          <div class="scenarioTitle">Typical mortgage</div>
-          <div class="scenarioDesc">$350,000 • 30 years • 6.50%</div>
-        </button>
-        <button class="scenario btn" data-scenario="auto25">
-          <div class="scenarioTitle">Auto loan</div>
-          <div class="scenarioDesc">$25,000 • 5 years • 7.90%</div>
-        </button>
-        <button class="scenario btn" data-scenario="student40">
-          <div class="scenarioTitle">Student loan</div>
-          <div class="scenarioDesc">$40,000 • 10 years • 6.00%</div>
-        </button>
-        <button class="scenario btn" data-scenario="cc4k">
-          <div class="scenarioTitle">Credit card payoff</div>
-          <div class="scenarioDesc">$4,000 • 24.00% • $200/mo</div>
-        </button>
-      </div>
-    </section>
-
-    <!-- LEARN -->
-    <section id="learn" class="card">
-      <h1>Learn</h1>
-      <div class="learnGrid">
-        <div class="learnBox">
-          <h3>APR (Annual Percentage Rate)</h3>
-          <p>APR is the yearly interest rate. For monthly calculations, we convert to a monthly rate (APR ÷ 12).</p>
-        </div>
-        <div class="learnBox">
-          <h3>Small rate changes add up</h3>
-          <p>On long terms (like 30-year mortgages), a +0.25% change can increase total interest by thousands.</p>
-        </div>
-        <div class="learnBox">
-          <h3>Extra payments</h3>
-          <p>Extra monthly payments reduce principal faster, shortening payoff time and reducing total interest.</p>
-        </div>
-        <div class="learnBox">
-          <h3>Refinance break-even</h3>
-          <p>Refinancing can save money if monthly savings exceed closing costs over the time you keep the loan.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ABOUT -->
-    <section id="about" class="card">
-      <h1>About</h1>
-      <p>
-        RateSense is a student-built tool translating interest-rate changes into real household impacts:
-        payments, payoff timelines, interest costs, and refinance tradeoffs.
-      </p>
-      <p class="muted">
-        Simplified assumptions for education. Not financial advice.
-      </p>
-    </section>
-  </main>
-
-  <footer class="wrap footer">
-    <span class="muted">© RateSense • Built with HTML/CSS/JS • Educational only</span>
-  </footer>
-
-  <script src="app.js"></script>
-</body>
-</html>
+          <div class="field amortizedO
