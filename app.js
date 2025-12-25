@@ -440,4 +440,130 @@ function calculateAndRender() {
   const keepYears = parseFloat(els.refiKeepYears.value);
 
   if (isFinite(refiApr) && isFinite(closingCosts) && closingCosts >= 0 && isFinite(keepYears) && keepYears > 0) {
-    const r = refinanceBreakeven(principa
+    const r = refinanceBreakeven(principal, apr, refiApr, years, extra, closingCosts, keepYears);
+
+    if (r.breakevenMonth === null) {
+      els.refiBreakeven.textContent = "No break-even within keep period";
+    } else {
+      els.refiBreakeven.textContent = `${r.breakevenMonth} months (~${(r.breakevenMonth/12).toFixed(1)} yrs)`;
+    }
+    els.refiSavings.textContent = `Estimated net savings over ${keepYears} years: ${fmtUSD2(r.netSavings)} (after closing costs)`;
+  } else {
+    els.refiBreakeven.textContent = "—";
+    els.refiSavings.textContent = "Enter new APR, closing costs, and keep years.";
+  }
+
+  lastSummary =
+    `RateSense summary (${loanType})\n` +
+    `Principal: ${fmtUSD2(principal)}\nTerm: ${years} years\nAPR baseline: ${apr.toFixed(2)}%\nExtra monthly payment: ${fmtUSD2(extra)}\n` +
+    `Scenario: +${delta.toFixed(2)}% => APR ${(aprNew).toFixed(2)}%\n\n` +
+    `Baseline monthly payment: ${fmtUSD2(baseMonthly)}\nBaseline payoff: ${baseSched.months} months\nBaseline total interest: ${fmtUSD2(baseSched.totalInterest)}\n\n` +
+    `Scenario monthly payment: ${fmtUSD2(newMonthly)}\nScenario total interest: ${fmtUSD2(newSched.totalInterest)}\n` +
+    `Δ monthly: ${fmtUSD2(dM)}\nΔ interest: ${fmtUSD2(dI)}\n\n` +
+    `Educational only; not financial advice.`;
+}
+
+// ---------- Reset ----------
+function resetAll() {
+  els.loanType.value = "mortgage";
+  els.principal.value = "";
+  els.termYears.value = "";
+  els.apr.value = "";
+  els.extraPayment.value = "0";
+  els.delta.value = "0";
+  els.customDelta.value = "";
+  els.customDeltaWrap.style.display = "none";
+  els.ccMode.value = "minimum";
+  els.ccFixedPayment.value = "";
+
+  els.refiNewApr.value = "";
+  els.refiClosingCosts.value = "";
+  els.refiKeepYears.value = "";
+
+  els.baseMonthly.textContent = "—";
+  els.newMonthly.textContent = "—";
+  els.deltaMonthly.textContent = "—";
+  els.baseInterest.textContent = "—";
+  els.newInterest.textContent = "—";
+  els.deltaInterest.textContent = "—";
+  els.baseTotalPaid.textContent = "—";
+  els.baseNote.textContent = "";
+
+  els.refiBreakeven.textContent = "—";
+  els.refiSavings.textContent = "—";
+
+  els.scenarioTbody.innerHTML = `<tr><td colspan="6" class="muted">Run a calculation to populate scenarios.</td></tr>`;
+
+  if (chart) { chart.destroy(); chart = null; }
+  lastSummary = "";
+  lastBaselineSchedule = null;
+
+  setStatus("");
+  showHideFields();
+}
+
+// ---------- Scenario Loader ----------
+const scenarios = {
+  mortgage350: { loanType: "mortgage", principal: 350000, years: 30, apr: 6.5, extra: 0 },
+  auto25: { loanType: "auto", principal: 25000, years: 5, apr: 7.9, extra: 0 },
+  student40: { loanType: "student", principal: 40000, years: 10, apr: 6.0, extra: 0 },
+  cc4k: { loanType: "creditcard", principal: 4000, apr: 24.0, ccMode: "fixed", ccFixedPayment: 200 },
+};
+
+function loadScenario(key) {
+  const s = scenarios[key];
+  if (!s) return;
+
+  els.loanType.value = s.loanType;
+  els.principal.value = s.principal;
+  els.apr.value = s.apr;
+
+  if (s.loanType === "creditcard") {
+    els.ccMode.value = s.ccMode || "minimum";
+    els.ccFixedPayment.value = s.ccFixedPayment ?? "";
+  } else {
+    els.termYears.value = s.years;
+    els.extraPayment.value = String(s.extra ?? 0);
+  }
+
+  els.delta.value = "0";
+  els.customDeltaWrap.style.display = "none";
+  showHideFields();
+  setStatus("Scenario loaded. Click Calculate.");
+  window.location.hash = "#calculator";
+}
+
+// ---------- Event Wiring ----------
+els.loanType.addEventListener("change", showHideFields);
+
+els.delta.addEventListener("change", () => {
+  const isCustom = els.delta.value === "custom";
+  els.customDeltaWrap.style.display = isCustom ? "" : "none";
+});
+
+els.calcBtn.addEventListener("click", calculateAndRender);
+els.resetBtn.addEventListener("click", resetAll);
+
+els.copyBtn.addEventListener("click", () => {
+  if (!lastSummary) {
+    setStatus("Run a calculation first, then copy.");
+    return;
+  }
+  copySummary(lastSummary);
+});
+
+els.chartBalanceBtn.addEventListener("click", () => {
+  chartMode = "balance";
+  if (lastBaselineSchedule) buildChart(lastBaselineSchedule);
+});
+els.chartSplitBtn.addEventListener("click", () => {
+  chartMode = "split";
+  if (lastBaselineSchedule) buildChart(lastBaselineSchedule);
+});
+
+document.querySelectorAll("[data-scenario]").forEach(btn => {
+  btn.addEventListener("click", () => loadScenario(btn.dataset.scenario));
+});
+
+// init
+resetAll();
