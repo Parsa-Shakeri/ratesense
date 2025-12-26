@@ -1,4 +1,3 @@
-<!-- index.html -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -20,6 +19,7 @@
 
     <nav class="nav">
       <a href="#calculator">Calculator</a>
+      <a href="#compare">Compare</a>
       <a href="#scenarios">Scenarios</a>
       <a href="#learn">Learn</a>
       <a href="#about">About</a>
@@ -27,6 +27,7 @@
   </header>
 
   <main class="wrap">
+    <!-- CALCULATOR -->
     <section id="calculator" class="card">
       <div class="topRow">
         <div>
@@ -104,7 +105,6 @@
             <div class="field">
               <label for="annualTax">Annual property tax ($/year)</label>
               <input id="annualTax" type="number" inputmode="decimal" min="0" step="1" placeholder="7200" />
-              <div class="hint">Optional. Used only to compute total monthly (PITI), not interest.</div>
             </div>
 
             <div class="field">
@@ -118,7 +118,7 @@
             </div>
           </div>
 
-          <!-- Credit card-only inputs -->
+          <!-- Credit card-only -->
           <div class="divider creditOnly"></div>
           <div class="field creditOnly">
             <label for="ccMode">Credit card payment mode</label>
@@ -131,7 +131,6 @@
           <div class="field creditOnly">
             <label for="ccFixedPayment">Fixed payment ($)</label>
             <input id="ccFixedPayment" type="number" inputmode="decimal" min="0" placeholder="200" />
-            <div class="hint">Used only if mode = Fixed monthly payment.</div>
           </div>
 
           <div class="actions">
@@ -142,9 +141,8 @@
           <details class="assumptions">
             <summary>Model assumptions</summary>
             <ul>
-              <li>Fixed-rate amortization (fees/taxes/insurance excluded from interest unless stated).</li>
-              <li>Extra payments are applied monthly and reduce principal.</li>
-              <li>PITI = (P&amp;I payment) + (tax/12) + (insurance/12) + HOA.</li>
+              <li>Fixed-rate amortization. Extra payments reduce principal.</li>
+              <li>PITI add-ons are budgeting add-ons, not part of interest math.</li>
               <li>Educational only — not financial advice.</li>
             </ul>
           </details>
@@ -160,19 +158,16 @@
               <div class="v" id="baseMonthly">—</div>
               <div class="s" id="baseNote"></div>
             </div>
-
             <div class="resultCard">
               <div class="k">New monthly payment</div>
               <div class="v" id="newMonthly">—</div>
               <div class="s" id="deltaMonthly">—</div>
             </div>
-
             <div class="resultCard">
               <div class="k">Baseline total interest</div>
               <div class="v" id="baseInterest">—</div>
               <div class="s" id="baseTotalPaid">—</div>
             </div>
-
             <div class="resultCard">
               <div class="k">New total interest</div>
               <div class="v" id="newInterest">—</div>
@@ -180,12 +175,11 @@
             </div>
           </div>
 
-          <!-- PITI cards (mortgage only) -->
           <div class="results mt mortgageOnly" id="pitiRow" style="display:none;">
             <div class="resultCard">
               <div class="k">Baseline total monthly (PITI)</div>
               <div class="v" id="basePITI">—</div>
-              <div class="s" id="pitiNote">Tax/Ins/HOA included</div>
+              <div class="s">Tax/Ins/HOA included</div>
             </div>
             <div class="resultCard">
               <div class="k">New total monthly (PITI)</div>
@@ -241,7 +235,6 @@
               <div class="field">
                 <label for="refiKeepYears">How long will you keep the loan? (years)</label>
                 <input id="refiKeepYears" type="number" inputmode="decimal" step="0.5" placeholder="5" />
-                <div class="hint">Estimates net savings over that time horizon.</div>
               </div>
 
               <div class="refiOut">
@@ -269,14 +262,6 @@
             </div>
           </div>
 
-          <details class="assumptions mt">
-            <summary>Disclosure</summary>
-            <p class="muted small">
-              RateSense is an educational calculator. Real loans include fees, compounding conventions, taxes/insurance (mortgages),
-              and variable-rate terms. Always verify with your lender.
-            </p>
-          </details>
-
           <div class="footnote">Educational only. Not financial advice.</div>
         </section>
       </div>
@@ -297,9 +282,100 @@
 
         <h2>Notes</h2>
         <div class="muted small">
-          Educational only. Not financial advice. Mortgage PITI add-ons are informational and not part of loan interest math.
+          Educational only. Not financial advice. PITI add-ons are budgeting add-ons and not part of loan interest.
         </div>
       </section>
+    </section>
+
+    <!-- COMPARE MODE -->
+    <section id="compare" class="card">
+      <div class="topRow">
+        <div>
+          <h1>Compare Mode</h1>
+          <p class="muted">Compare Loan A vs Loan B side-by-side (payments, interest, payoff time, and mortgage PITI).</p>
+        </div>
+
+        <div class="topActions no-print">
+          <button id="compareCopyBtn" class="btn">Copy compare summary</button>
+          <button id="compareBtn" class="btn primary">Run compare</button>
+          <span id="compareStatus" class="status"></span>
+        </div>
+      </div>
+
+      <div class="compareGrid">
+        <div class="panel">
+          <h2>Loan A</h2>
+
+          <div class="field">
+            <label for="aType">Loan type</label>
+            <select id="aType">
+              <option value="mortgage">Mortgage</option>
+              <option value="auto">Auto</option>
+              <option value="student">Student</option>
+            </select>
+          </div>
+
+          <div class="field"><label for="aP">Principal ($)</label><input id="aP" type="number" /></div>
+          <div class="field"><label for="aTerm">Term (years)</label><input id="aTerm" type="number" /></div>
+          <div class="field"><label for="aApr">APR (%)</label><input id="aApr" type="number" step="0.01"/></div>
+          <div class="field"><label for="aExtra">Extra monthly ($)</label><input id="aExtra" type="number" /></div>
+
+          <div class="divider"></div>
+
+          <div class="mortgageOnlyA">
+            <h2>PITI (A)</h2>
+            <div class="field"><label for="aTax">Annual tax</label><input id="aTax" type="number" /></div>
+            <div class="field"><label for="aIns">Annual insurance</label><input id="aIns" type="number" /></div>
+            <div class="field"><label for="aHoa">HOA monthly</label><input id="aHoa" type="number" /></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Loan B</h2>
+
+          <div class="field">
+            <label for="bType">Loan type</label>
+            <select id="bType">
+              <option value="mortgage">Mortgage</option>
+              <option value="auto">Auto</option>
+              <option value="student">Student</option>
+            </select>
+          </div>
+
+          <div class="field"><label for="bP">Principal ($)</label><input id="bP" type="number" /></div>
+          <div class="field"><label for="bTerm">Term (years)</label><input id="bTerm" type="number" /></div>
+          <div class="field"><label for="bApr">APR (%)</label><input id="bApr" type="number" step="0.01"/></div>
+          <div class="field"><label for="bExtra">Extra monthly ($)</label><input id="bExtra" type="number" /></div>
+
+          <div class="divider"></div>
+
+          <div class="mortgageOnlyB">
+            <h2>PITI (B)</h2>
+            <div class="field"><label for="bTax">Annual tax</label><input id="bTax" type="number" /></div>
+            <div class="field"><label for="bIns">Annual insurance</label><input id="bIns" type="number" /></div>
+            <div class="field"><label for="bHoa">HOA monthly</label><input id="bHoa" type="number" /></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="box mt">
+        <h3>Compare results</h3>
+        <div class="tableWrap">
+          <table id="compareTable">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Loan A</th>
+                <th>Loan B</th>
+                <th>Difference (B − A)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="4" class="muted">Run compare to see results.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <!-- SCENARIOS -->
@@ -332,20 +408,20 @@
       <h1>Learn</h1>
       <div class="learnGrid">
         <div class="learnBox">
-          <h3>APR (Annual Percentage Rate)</h3>
-          <p>APR is the yearly interest rate. For monthly calculations, we convert to a monthly rate (APR ÷ 12).</p>
-        </div>
-        <div class="learnBox">
-          <h3>Small rate changes add up</h3>
-          <p>On long terms (like 30-year mortgages), a +0.25% change can increase total interest by thousands.</p>
-        </div>
-        <div class="learnBox">
-          <h3>Extra payments</h3>
-          <p>Extra monthly payments reduce principal faster, shortening payoff time and reducing total interest.</p>
+          <h3>APR</h3>
+          <p>APR is the yearly interest rate. We convert it to a monthly rate for calculations.</p>
         </div>
         <div class="learnBox">
           <h3>PITI</h3>
-          <p>For mortgages, many people budget using PITI: Principal + Interest + Taxes + Insurance (+ HOA).</p>
+          <p>For mortgages, many budgets use PITI: Principal + Interest + Taxes + Insurance (+ HOA).</p>
+        </div>
+        <div class="learnBox">
+          <h3>Total interest</h3>
+          <p>Total interest can be huge over long terms. Small APR changes can add up.</p>
+        </div>
+        <div class="learnBox">
+          <h3>Extra payments</h3>
+          <p>Extra payments reduce principal faster and cut interest costs.</p>
         </div>
       </div>
     </section>
@@ -353,11 +429,8 @@
     <!-- ABOUT -->
     <section id="about" class="card">
       <h1>About</h1>
-      <p>
-        RateSense translates interest-rate changes into real household impacts:
-        payments, payoff timelines, interest costs, refinance tradeoffs, and (for mortgages) PITI budgeting.
-      </p>
-      <p class="muted">Simplified assumptions for education. Not financial advice.</p>
+      <p>RateSense is an educational finance calculator built as a public portfolio project.</p>
+      <p class="muted">Not financial advice.</p>
     </section>
   </main>
 
