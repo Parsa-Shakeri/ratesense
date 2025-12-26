@@ -218,4 +218,14 @@ canvas { width: 100% !important; height: 100% !important; }
   }
   .wrap{ max-width: 100% !important; padding: 0 !important; }
   a{ color:#000 !important; text-decoration:none !important; }
+    /* ----- Compare Mode ----- */
+  .compareGrid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:12px;
+  }
+  @media (max-width:980px){
+  .compareGrid{ grid-template-columns: 1fr; }
+  }
+
 }
