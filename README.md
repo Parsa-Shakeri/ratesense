@@ -11,9 +11,9 @@ RateSense is a student-built finance calculator that translates interest-rate ch
 - Includes **refinance break-even** estimate (closing costs + keep horizon)
 - For mortgages, supports **PITI budgeting**:
   - Principal + Interest (P&I)
-  - + Property taxes (annual → monthly)
-  - + Homeowners insurance (annual → monthly)
-  - + HOA / extra monthly costs
+    + Property taxes (annual → monthly)
+    + Homeowners insurance (annual → monthly)
+    + HOA / extra monthly costs
 
 ## Key product features
 - **Charts** (balance over time; principal vs interest split)
