@@ -27,12 +27,11 @@
   </header>
 
   <main class="wrap">
-    <!-- CALCULATOR -->
     <section id="calculator" class="card">
       <div class="topRow">
         <div>
           <h1>Calculator</h1>
-          <p class="muted">Payments, total interest, extra payments, refinance break-even, charts, and exports.</p>
+          <p class="muted">Payments, total interest, extra payments, refinance break-even, charts, exports, and PITI (mortgage).</p>
         </div>
 
         <div class="topActions no-print">
@@ -97,7 +96,30 @@
             <input id="customDelta" type="number" inputmode="decimal" step="0.01" placeholder="0.75" />
           </div>
 
+          <!-- Mortgage-only: PITI -->
+          <div class="divider mortgageOnly"></div>
+          <div class="mortgageOnly">
+            <h2>PITI add-ons (mortgage)</h2>
+
+            <div class="field">
+              <label for="annualTax">Annual property tax ($/year)</label>
+              <input id="annualTax" type="number" inputmode="decimal" min="0" step="1" placeholder="7200" />
+              <div class="hint">Optional. Used only to compute total monthly (PITI), not interest.</div>
+            </div>
+
+            <div class="field">
+              <label for="annualIns">Annual homeowners insurance ($/year)</label>
+              <input id="annualIns" type="number" inputmode="decimal" min="0" step="1" placeholder="1800" />
+            </div>
+
+            <div class="field">
+              <label for="monthlyHOA">HOA / other monthly costs ($/mo)</label>
+              <input id="monthlyHOA" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
+            </div>
+          </div>
+
           <!-- Credit card-only inputs -->
+          <div class="divider creditOnly"></div>
           <div class="field creditOnly">
             <label for="ccMode">Credit card payment mode</label>
             <select id="ccMode">
@@ -120,9 +142,9 @@
           <details class="assumptions">
             <summary>Model assumptions</summary>
             <ul>
-              <li>Fixed-rate amortization (no taxes/insurance/fees unless you add them externally).</li>
+              <li>Fixed-rate amortization (fees/taxes/insurance excluded from interest unless stated).</li>
               <li>Extra payments are applied monthly and reduce principal.</li>
-              <li>Credit card payoff uses a simplified month-by-month simulation.</li>
+              <li>PITI = (P&amp;I payment) + (tax/12) + (insurance/12) + HOA.</li>
               <li>Educational only — not financial advice.</li>
             </ul>
           </details>
@@ -138,20 +160,47 @@
               <div class="v" id="baseMonthly">—</div>
               <div class="s" id="baseNote"></div>
             </div>
+
             <div class="resultCard">
               <div class="k">New monthly payment</div>
               <div class="v" id="newMonthly">—</div>
               <div class="s" id="deltaMonthly">—</div>
             </div>
+
             <div class="resultCard">
               <div class="k">Baseline total interest</div>
               <div class="v" id="baseInterest">—</div>
               <div class="s" id="baseTotalPaid">—</div>
             </div>
+
             <div class="resultCard">
               <div class="k">New total interest</div>
               <div class="v" id="newInterest">—</div>
               <div class="s" id="deltaInterest">—</div>
+            </div>
+          </div>
+
+          <!-- PITI cards (mortgage only) -->
+          <div class="results mt mortgageOnly" id="pitiRow" style="display:none;">
+            <div class="resultCard">
+              <div class="k">Baseline total monthly (PITI)</div>
+              <div class="v" id="basePITI">—</div>
+              <div class="s" id="pitiNote">Tax/Ins/HOA included</div>
+            </div>
+            <div class="resultCard">
+              <div class="k">New total monthly (PITI)</div>
+              <div class="v" id="newPITI">—</div>
+              <div class="s" id="deltaPITI">—</div>
+            </div>
+            <div class="resultCard">
+              <div class="k">Monthly add-ons</div>
+              <div class="v" id="pitiAddons">—</div>
+              <div class="s">Tax + Ins + HOA</div>
+            </div>
+            <div class="resultCard">
+              <div class="k">Δ PITI (scenario)</div>
+              <div class="v" id="pitiDeltaAbs">—</div>
+              <div class="s" id="pitiDeltaPct">—</div>
             </div>
           </div>
 
@@ -232,7 +281,7 @@
         </section>
       </div>
 
-      <!-- PRINT REPORT (shown only on print) -->
+      <!-- PRINT REPORT -->
       <section id="report" class="print-only">
         <h1>RateSense Report</h1>
         <div class="muted small" id="reportDate"></div>
@@ -248,7 +297,7 @@
 
         <h2>Notes</h2>
         <div class="muted small">
-          Educational only. Not financial advice. Mortgage excludes taxes/insurance unless added externally.
+          Educational only. Not financial advice. Mortgage PITI add-ons are informational and not part of loan interest math.
         </div>
       </section>
     </section>
@@ -295,8 +344,8 @@
           <p>Extra monthly payments reduce principal faster, shortening payoff time and reducing total interest.</p>
         </div>
         <div class="learnBox">
-          <h3>Refinance break-even</h3>
-          <p>Refinancing can save money if monthly savings exceed closing costs over the time you keep the loan.</p>
+          <h3>PITI</h3>
+          <p>For mortgages, many people budget using PITI: Principal + Interest + Taxes + Insurance (+ HOA).</p>
         </div>
       </div>
     </section>
@@ -305,12 +354,10 @@
     <section id="about" class="card">
       <h1>About</h1>
       <p>
-        RateSense is a student-built tool translating interest-rate changes into real household impacts:
-        payments, payoff timelines, interest costs, and refinance tradeoffs.
+        RateSense translates interest-rate changes into real household impacts:
+        payments, payoff timelines, interest costs, refinance tradeoffs, and (for mortgages) PITI budgeting.
       </p>
-      <p class="muted">
-        Simplified assumptions for education. Not financial advice.
-      </p>
+      <p class="muted">Simplified assumptions for education. Not financial advice.</p>
     </section>
   </main>
 
