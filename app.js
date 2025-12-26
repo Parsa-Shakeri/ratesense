@@ -1,4 +1,3 @@
-// app.js
 "use strict";
 
 // ---------- Helpers ----------
@@ -39,6 +38,13 @@ function setParam(url, key, value) {
 function safeNum(v, def = 0) {
   const x = parseFloat(v);
   return isFinite(x) ? x : def;
+}
+
+function copyToClipboard(text, okMsg, statusEl) {
+  navigator.clipboard.writeText(text).then(() => {
+    statusEl.textContent = okMsg;
+    setTimeout(() => statusEl.textContent = "", 1500);
+  }).catch(() => statusEl.textContent = "Copy failed (clipboard blocked).");
 }
 
 // ---------- Core Math ----------
@@ -158,6 +164,9 @@ function refinanceBreakeven(principal, baseApr, newApr, years, extraMonthly, clo
 
 // ---------- UI Elements ----------
 const els = {
+  menuBtn: $("menuBtn"),
+  nav: $("nav"),
+
   loanType: $("loanType"),
   principal: $("principal"),
   termYears: $("termYears"),
@@ -170,13 +179,13 @@ const els = {
   ccFixedPayment: $("ccFixedPayment"),
   status: $("status"),
 
-  // Mortgage add-ons
   annualTax: $("annualTax"),
   annualIns: $("annualIns"),
   monthlyHOA: $("monthlyHOA"),
   pitiRow: $("pitiRow"),
   basePITI: $("basePITI"),
   newPITI: $("newPITI"),
+  deltaPITI: $("deltaPITI"),
   pitiAddons: $("pitiAddons"),
   pitiDeltaAbs: $("pitiDeltaAbs"),
   pitiDeltaPct: $("pitiDeltaPct"),
@@ -218,6 +227,24 @@ const els = {
 
 function setStatus(msg) { els.status.textContent = msg || ""; }
 
+// ---------- Mobile menu ----------
+function initMenu() {
+  if (!els.menuBtn || !els.nav) return;
+  els.menuBtn.addEventListener("click", () => {
+    const open = els.nav.classList.toggle("open");
+    els.menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  // close menu when clicking a link (mobile)
+  els.nav.querySelectorAll("a").forEach(a => {
+    a.addEventListener("click", () => {
+      els.nav.classList.remove("open");
+      els.menuBtn.setAttribute("aria-expanded", "false");
+    });
+  });
+}
+initMenu();
+
+// ---------- Field visibility ----------
 function showHideFields() {
   const type = els.loanType.value;
   const isCC = type === "creditcard";
@@ -227,40 +254,43 @@ function showHideFields() {
   document.querySelectorAll(".creditOnly").forEach(el => el.style.display = isCC ? "" : "none");
   document.querySelectorAll(".mortgageOnly").forEach(el => el.style.display = isMortgage ? "" : "none");
 
-  // PITI row display happens after calculation
   els.pitiRow.style.display = "none";
 }
 
 function getDelta() {
-  if (els.delta.value === "custom") {
-    const c = safeNum(els.customDelta.value, 0);
-    return c;
-  }
+  if (els.delta.value === "custom") return safeNum(els.customDelta.value, 0);
   return safeNum(els.delta.value, 0);
 }
 
 function validateInputs() {
   const principal = safeNum(els.principal.value, NaN);
   const apr = safeNum(els.apr.value, NaN);
-  if (!(principal > 0)) return { ok: false, msg: "Enter a principal/balance > 0." };
-  if (!(apr >= 0)) return { ok: false, msg: "Enter APR (>= 0)." };
+  if (!(principal > 0)) return { ok: false, msg: "Enter a loan balance greater than 0." };
+  if (!(apr >= 0)) return { ok: false, msg: "Enter an annual interest rate (0 or higher)." };
 
   if (els.loanType.value !== "creditcard") {
     const years = safeNum(els.termYears.value, NaN);
-    if (!(years > 0)) return { ok: false, msg: "Enter term in years > 0." };
+    if (!(years > 0)) return { ok: false, msg: "Enter loan length in years (greater than 0)." };
     const extra = safeNum(els.extraPayment.value, 0);
-    if (!(extra >= 0)) return { ok: false, msg: "Extra payment must be >= 0." };
+    if (!(extra >= 0)) return { ok: false, msg: "Extra monthly amount must be 0 or higher." };
   } else {
-    const mode = els.ccMode.value;
-    if (mode === "fixed") {
+    if (els.ccMode.value === "fixed") {
       const fp = safeNum(els.ccFixedPayment.value, NaN);
-      if (!(fp > 0)) return { ok: false, msg: "Enter a fixed payment > 0." };
+      if (!(fp > 0)) return { ok: false, msg: "Enter a fixed monthly payment greater than 0." };
     }
   }
   return { ok: true };
 }
 
-// ---------- Scenario Tables ----------
+// ---------- Mortgage monthly add-ons ----------
+function mortgageAddonsMonthly() {
+  const taxesMonthly = safeNum(els.annualTax.value, 0) / 12;
+  const insuranceMonthly = safeNum(els.annualIns.value, 0) / 12;
+  const housingFeesMonthly = safeNum(els.monthlyHOA.value, 0);
+  return { taxesMonthly, insuranceMonthly, housingFeesMonthly, addons: taxesMonthly + insuranceMonthly + housingFeesMonthly };
+}
+
+// ---------- Scenario tables ----------
 function renderScenarioTableAmortized(baseApr, principal, years, extra) {
   els.scenarioTbody.innerHTML = "";
   const deltas = [0, 0.25, 0.50, 1.00];
@@ -277,7 +307,7 @@ function renderScenarioTableAmortized(baseApr, principal, years, extra) {
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${idx === 0 ? "Baseline" : "+" + d.toFixed(2) + "%"}</td>
+      <td>${idx === 0 ? "Baseline" : "Increase by " + d.toFixed(2) + "%"}</td>
       <td>${apr.toFixed(2)}%</td>
       <td>${fmtUSD2(monthly)}</td>
       <td>${fmtUSD2(interest)}</td>
@@ -300,11 +330,11 @@ function renderScenarioTableCC(balance, baseApr, mode, fixedPayment) {
     const sim = creditCardSim(balance, baseApr + d, mode, fixedPayment);
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${idx === 0 ? "Baseline" : "+" + d.toFixed(2) + "%"}</td>
+      <td>${idx === 0 ? "Baseline" : "Increase by " + d.toFixed(2) + "%"}</td>
       <td>${(baseApr + d).toFixed(2)}%</td>
-      <td>${sim.months} mo</td>
+      <td>${sim.months} months</td>
       <td>${fmtUSD2(sim.totalInterest)}</td>
-      <td>${idx === 0 ? "—" : (sim.months - base.months >= 0 ? "+" : "") + (sim.months - base.months) + " mo"}</td>
+      <td>${idx === 0 ? "—" : (sim.months - base.months >= 0 ? "+" : "") + (sim.months - base.months) + " months"}</td>
       <td>${idx === 0 ? "—" : (sim.totalInterest - base.totalInterest >= 0 ? "+" : "") + fmtUSD2(sim.totalInterest - base.totalInterest)}</td>
     `;
     els.scenarioTbody.appendChild(tr);
@@ -337,8 +367,8 @@ function buildChart(scheduleObj) {
   const data = isBalance
     ? { labels, datasets: [{ label: "Remaining balance", data: bal, borderWidth: 2, pointRadius: 0, tension: 0.25, fill: true }] }
     : { labels, datasets: [
-        { label: "Interest portion (monthly)", data: intP, borderWidth: 2, pointRadius: 0, tension: 0.25 },
-        { label: "Principal portion (monthly)", data: prinP, borderWidth: 2, pointRadius: 0, tension: 0.25 }
+        { label: "Interest part of payment (monthly)", data: intP, borderWidth: 2, pointRadius: 0, tension: 0.25 },
+        { label: "Principal part of payment (monthly)", data: prinP, borderWidth: 2, pointRadius: 0, tension: 0.25 }
       ]};
 
   if (chart) chart.destroy();
@@ -388,11 +418,10 @@ function buildShareURL() {
     setParam(url, "reficost", els.refiClosingCosts.value);
     setParam(url, "keep", els.refiKeepYears.value);
 
-    // Mortgage add-ons
     if (loanType === "mortgage") {
       setParam(url, "tax", els.annualTax.value);
       setParam(url, "ins", els.annualIns.value);
-      setParam(url, "hoa", els.monthlyHOA.value);
+      setParam(url, "fees", els.monthlyHOA.value);
     }
   } else {
     setParam(url, "ccmode", els.ccMode.value);
@@ -409,51 +438,36 @@ function applyParamsFromURL() {
   const loan = p.get("loan");
   if (loan) els.loanType.value = loan;
 
-  const principal = p.get("p");
-  const apr = p.get("apr");
-  const term = p.get("term");
-  const extra = p.get("extra");
-  const delta = p.get("delta");
-  const cdelta = p.get("cdelta");
-
-  if (principal) els.principal.value = principal;
-  if (apr) els.apr.value = apr;
-  if (delta) els.delta.value = delta;
+  if (p.get("p")) els.principal.value = p.get("p");
+  if (p.get("apr")) els.apr.value = p.get("apr");
+  if (p.get("delta")) els.delta.value = p.get("delta");
 
   els.customDeltaWrap.style.display = (els.delta.value === "custom") ? "" : "none";
-  if (cdelta) els.customDelta.value = cdelta;
+  if (p.get("cdelta")) els.customDelta.value = p.get("cdelta");
 
   if (els.loanType.value !== "creditcard") {
-    if (term) els.termYears.value = term;
-    if (extra) els.extraPayment.value = extra;
+    if (p.get("term")) els.termYears.value = p.get("term");
+    if (p.get("extra")) els.extraPayment.value = p.get("extra");
 
-    const refiapr = p.get("refiapr");
-    const reficost = p.get("reficost");
-    const keep = p.get("keep");
-    if (refiapr) els.refiNewApr.value = refiapr;
-    if (reficost) els.refiClosingCosts.value = reficost;
-    if (keep) els.refiKeepYears.value = keep;
+    if (p.get("refiapr")) els.refiNewApr.value = p.get("refiapr");
+    if (p.get("reficost")) els.refiClosingCosts.value = p.get("reficost");
+    if (p.get("keep")) els.refiKeepYears.value = p.get("keep");
 
     if (els.loanType.value === "mortgage") {
-      const tax = p.get("tax");
-      const ins = p.get("ins");
-      const hoa = p.get("hoa");
-      if (tax) els.annualTax.value = tax;
-      if (ins) els.annualIns.value = ins;
-      if (hoa) els.monthlyHOA.value = hoa;
+      if (p.get("tax")) els.annualTax.value = p.get("tax");
+      if (p.get("ins")) els.annualIns.value = p.get("ins");
+      if (p.get("fees")) els.monthlyHOA.value = p.get("fees");
     }
   } else {
-    const ccmode = p.get("ccmode");
-    const ccpay = p.get("ccpay");
-    if (ccmode) els.ccMode.value = ccmode;
-    if (ccpay) els.ccFixedPayment.value = ccpay;
+    if (p.get("ccmode")) els.ccMode.value = p.get("ccmode");
+    if (p.get("ccpay")) els.ccFixedPayment.value = p.get("ccpay");
   }
 
   showHideFields();
   setStatus("Loaded from share link. Click Calculate.");
 }
 
-// ---------- CSV Export ----------
+// ---------- CSV ----------
 function scheduleToCSV(scheduleObj) {
   const lines = [];
   lines.push(["Month","Payment","Interest","Principal","Balance"].join(","));
@@ -463,13 +477,7 @@ function scheduleToCSV(scheduleObj) {
     sumPay += row.payment;
     sumInt += row.interest;
     sumPrin += row.principal;
-    lines.push([
-      row.month,
-      row.payment.toFixed(2),
-      row.interest.toFixed(2),
-      row.principal.toFixed(2),
-      row.balance.toFixed(2)
-    ].join(","));
+    lines.push([row.month, row.payment.toFixed(2), row.interest.toFixed(2), row.principal.toFixed(2), row.balance.toFixed(2)].join(","));
   }
 
   lines.push("");
@@ -487,75 +495,57 @@ function updateReportBlocks() {
 
   const inputLines = [];
   inputLines.push(`Loan type: ${loanType}`);
-  inputLines.push(`Principal/balance: ${fmtUSD2(safeNum(els.principal.value, NaN))}`);
-  inputLines.push(`APR: ${safeNum(els.apr.value, NaN).toFixed(2)}%`);
-  inputLines.push(`Rate scenario: +${delta.toFixed(2)}%`);
+  inputLines.push(`Loan balance: ${fmtUSD2(safeNum(els.principal.value, NaN))}`);
+  inputLines.push(`Annual interest rate: ${safeNum(els.apr.value, NaN).toFixed(2)}%`);
+  inputLines.push(`Scenario: increase by ${delta.toFixed(2)}%`);
 
   if (loanType !== "creditcard") {
-    inputLines.push(`Term: ${safeNum(els.termYears.value, NaN)} years`);
-    inputLines.push(`Extra payment: ${fmtUSD2(safeNum(els.extraPayment.value, 0))}`);
+    inputLines.push(`Loan length: ${safeNum(els.termYears.value, NaN)} years`);
+    inputLines.push(`Extra monthly payment: ${fmtUSD2(safeNum(els.extraPayment.value, 0))}`);
     if (loanType === "mortgage") {
-      const taxM = safeNum(els.annualTax.value, 0) / 12;
-      const insM = safeNum(els.annualIns.value, 0) / 12;
-      const hoaM = safeNum(els.monthlyHOA.value, 0);
-      inputLines.push(`PITI add-ons (monthly): tax ${fmtUSD2(taxM)}, ins ${fmtUSD2(insM)}, HOA ${fmtUSD2(hoaM)}`);
+      const { taxesMonthly, insuranceMonthly, housingFeesMonthly } = mortgageAddonsMonthly();
+      inputLines.push(`Monthly housing add-ons: taxes ${fmtUSD2(taxesMonthly)}, insurance ${fmtUSD2(insuranceMonthly)}, fees ${fmtUSD2(housingFeesMonthly)}`);
     }
   } else {
-    inputLines.push(`CC mode: ${els.ccMode.value}`);
-    if (els.ccMode.value === "fixed") inputLines.push(`Fixed payment: ${fmtUSD2(safeNum(els.ccFixedPayment.value, NaN))}`);
+    inputLines.push(`Credit card payment style: ${els.ccMode.value}`);
+    if (els.ccMode.value === "fixed") inputLines.push(`Fixed monthly payment: ${fmtUSD2(safeNum(els.ccFixedPayment.value, NaN))}`);
   }
 
   els.reportInputs.textContent = inputLines.join("\n");
 
   const resultsLines = [];
-  resultsLines.push(`Baseline monthly: ${els.baseMonthly.textContent}`);
+  resultsLines.push(`Baseline monthly payment: ${els.baseMonthly.textContent}`);
   if (els.baseNote.textContent) resultsLines.push(`${els.baseNote.textContent}`);
-  resultsLines.push(`Baseline interest: ${els.baseInterest.textContent}`);
+  resultsLines.push(`Baseline total interest: ${els.baseInterest.textContent}`);
   if (els.baseTotalPaid.textContent) resultsLines.push(`${els.baseTotalPaid.textContent}`);
   resultsLines.push("");
-  resultsLines.push(`Scenario monthly: ${els.newMonthly.textContent}`);
-  resultsLines.push(`Δ monthly: ${els.deltaMonthly.textContent}`);
-  resultsLines.push(`Scenario interest: ${els.newInterest.textContent}`);
-  resultsLines.push(`Δ interest: ${els.deltaInterest.textContent}`);
+  resultsLines.push(`Scenario monthly payment: ${els.newMonthly.textContent}`);
+  resultsLines.push(`Change in monthly payment: ${els.deltaMonthly.textContent}`);
+  resultsLines.push(`Scenario total interest: ${els.newInterest.textContent}`);
+  resultsLines.push(`Change in total interest: ${els.deltaInterest.textContent}`);
 
   if (loanType === "mortgage" && els.pitiRow.style.display !== "none") {
     resultsLines.push("");
-    resultsLines.push(`Baseline PITI: ${els.basePITI.textContent}`);
-    resultsLines.push(`Scenario PITI: ${els.newPITI.textContent}`);
-    resultsLines.push(`Δ PITI: ${els.pitiDeltaAbs.textContent} (${els.pitiDeltaPct.textContent})`);
+    resultsLines.push(`Baseline total monthly housing cost: ${els.basePITI.textContent}`);
+    resultsLines.push(`Scenario total monthly housing cost: ${els.newPITI.textContent}`);
+    resultsLines.push(`Change in total monthly housing cost: ${els.pitiDeltaAbs.textContent} (${els.pitiDeltaPct.textContent})`);
   }
 
   els.reportResults.textContent = resultsLines.join("\n");
 
   const refiLines = [];
-  refiLines.push(`New APR: ${els.refiNewApr.value || "—"}`);
-  refiLines.push(`Closing costs: ${els.refiClosingCosts.value ? fmtUSD2(safeNum(els.refiClosingCosts.value, 0)) : "—"}`);
+  refiLines.push(`New annual interest rate: ${els.refiNewApr.value || "—"}`);
+  refiLines.push(`One-time refinance costs: ${els.refiClosingCosts.value ? fmtUSD2(safeNum(els.refiClosingCosts.value, 0)) : "—"}`);
   refiLines.push(`Keep years: ${els.refiKeepYears.value || "—"}`);
-  refiLines.push(`Break-even: ${els.refiBreakeven.textContent}`);
-  refiLines.push(`Savings: ${els.refiSavings.textContent}`);
+  refiLines.push(`Estimated break-even: ${els.refiBreakeven.textContent}`);
+  refiLines.push(`Estimated savings: ${els.refiSavings.textContent}`);
   els.reportRefi.textContent = refiLines.join("\n");
 }
 
-// ---------- Copy summary ----------
+// ---------- Main ----------
 let lastSummary = "";
 let lastBaselineSchedule = null;
 
-function copyToClipboard(text, okMsg="Copied.") {
-  navigator.clipboard.writeText(text).then(() => {
-    setStatus(okMsg);
-    setTimeout(() => setStatus(""), 1500);
-  }).catch(() => setStatus("Copy failed (clipboard blocked)."));
-}
-
-// ---------- PITI helpers ----------
-function mortgageAddonsMonthly() {
-  const taxM = safeNum(els.annualTax.value, 0) / 12;
-  const insM = safeNum(els.annualIns.value, 0) / 12;
-  const hoaM = safeNum(els.monthlyHOA.value, 0);
-  return { taxM, insM, hoaM, addons: taxM + insM + hoaM };
-}
-
-// ---------- Main Calculation ----------
 function calculateAndRender() {
   const v = validateInputs();
   if (!v.ok) { setStatus(v.msg); return; }
@@ -567,7 +557,6 @@ function calculateAndRender() {
   const delta = getDelta();
   const aprNew = apr + delta;
 
-  // Hide PITI row unless we explicitly show it for mortgage after calc
   els.pitiRow.style.display = "none";
 
   if (loanType === "creditcard") {
@@ -580,7 +569,7 @@ function calculateAndRender() {
     els.baseMonthly.textContent = "—";
     els.newMonthly.textContent = "—";
     els.baseNote.textContent = `Baseline payoff time: ${base.months} months${base.paidOff ? "" : " (may not fully pay off)"}`;
-    els.deltaMonthly.textContent = `New payoff time: ${next.months} months • Δ ${(next.months - base.months >= 0 ? "+" : "")}${next.months - base.months} mo`;
+    els.deltaMonthly.textContent = `Scenario payoff time: ${next.months} months • Change ${(next.months - base.months >= 0 ? "+" : "")}${next.months - base.months} months`;
 
     els.baseInterest.textContent = fmtUSD2(base.totalInterest);
     els.baseTotalPaid.textContent = `Total paid: ${fmtUSD2(base.totalPaid)}`;
@@ -593,14 +582,14 @@ function calculateAndRender() {
     lastBaselineSchedule = null;
 
     els.refiBreakeven.textContent = "—";
-    els.refiSavings.textContent = "Refinance applies to amortized loans only.";
+    els.refiSavings.textContent = "Refinance estimate applies to mortgage/auto/student loans only.";
 
     lastSummary =
-      `RateSense summary (Credit Card)\n` +
-      `Balance: ${fmtUSD2(principal)}\nAPR: ${apr.toFixed(2)}% (Scenario: +${delta.toFixed(2)}% => ${(aprNew).toFixed(2)}%)\n` +
+      `RateSense summary (Credit card)\n` +
+      `Balance: ${fmtUSD2(principal)}\nAnnual interest rate: ${apr.toFixed(2)}% (Scenario: +${delta.toFixed(2)}% => ${(aprNew).toFixed(2)}%)\n` +
       `Baseline payoff: ${base.months} months, total interest ${fmtUSD2(base.totalInterest)}\n` +
-      `New payoff: ${next.months} months, total interest ${fmtUSD2(next.totalInterest)}\n` +
-      `Δ interest: ${fmtUSD2(next.totalInterest - base.totalInterest)}\n` +
+      `Scenario payoff: ${next.months} months, total interest ${fmtUSD2(next.totalInterest)}\n` +
+      `Change in interest: ${fmtUSD2(next.totalInterest - base.totalInterest)}\n` +
       `Educational only; not financial advice.`;
 
     updateReportBlocks();
@@ -617,7 +606,7 @@ function calculateAndRender() {
   const newMonthly = newSched.monthlyPaymentBase;
 
   els.baseMonthly.textContent = fmtUSD2(baseMonthly);
-  els.baseNote.textContent = `Payoff: ${baseSched.months} months${extra > 0 ? " (with extra payment)" : ""}`;
+  els.baseNote.textContent = `Payoff time: ${baseSched.months} months${extra > 0 ? " (includes extra monthly payments)" : ""}`;
   els.baseInterest.textContent = fmtUSD2(baseSched.totalInterest);
   els.baseTotalPaid.textContent = `Total paid: ${fmtUSD2(baseSched.totalPaid)}`;
 
@@ -632,60 +621,59 @@ function calculateAndRender() {
   lastBaselineSchedule = baseSched;
   buildChart(baseSched);
 
-  // Mortgage PITI display
+  // Mortgage: total monthly housing cost
   if (loanType === "mortgage") {
-    const { taxM, insM, hoaM, addons } = mortgageAddonsMonthly();
-    const basePITI = baseMonthly + addons;
-    const newPITI = newMonthly + addons;
-    const dP = newPITI - basePITI;
+    const { taxesMonthly, insuranceMonthly, housingFeesMonthly, addons } = mortgageAddonsMonthly();
+    const baseHousing = baseMonthly + addons;
+    const newHousing = newMonthly + addons;
+    const dH = newHousing - baseHousing;
 
-    // Only show if user entered anything OR if it's non-zero
     if (addons > 0) {
       els.pitiRow.style.display = "";
-      els.basePITI.textContent = fmtUSD2(basePITI);
-      els.newPITI.textContent = fmtUSD2(newPITI);
+      els.basePITI.textContent = fmtUSD2(baseHousing);
+      els.newPITI.textContent = fmtUSD2(newHousing);
+      els.deltaPITI.textContent = `Change: ${(dH >= 0 ? "+" : "")}${fmtUSD2(dH)}`;
       els.pitiAddons.textContent = fmtUSD2(addons);
-      els.pitiDeltaAbs.textContent = (dP >= 0 ? "+" : "") + fmtUSD2(dP);
-      els.pitiDeltaPct.textContent = fmtPct(dP / basePITI);
+      els.pitiDeltaAbs.textContent = (dH >= 0 ? "+" : "") + fmtUSD2(dH);
+      els.pitiDeltaPct.textContent = fmtPct(dH / baseHousing);
     }
   }
 
-  // Refi
+  // Refinance
   const refiApr = safeNum(els.refiNewApr.value, NaN);
   const closingCosts = safeNum(els.refiClosingCosts.value, NaN);
   const keepYears = safeNum(els.refiKeepYears.value, NaN);
 
   if (isFinite(refiApr) && isFinite(closingCosts) && closingCosts >= 0 && isFinite(keepYears) && keepYears > 0) {
     const r = refinanceBreakeven(principal, apr, refiApr, years, extra, closingCosts, keepYears);
-    if (r.breakevenMonth === null) els.refiBreakeven.textContent = "No break-even within keep period";
-    else els.refiBreakeven.textContent = `${r.breakevenMonth} months (~${(r.breakevenMonth/12).toFixed(1)} yrs)`;
-    els.refiSavings.textContent = `Estimated net savings over ${keepYears} years: ${fmtUSD2(r.netSavings)} (after closing costs)`;
+    if (r.breakevenMonth === null) els.refiBreakeven.textContent = "No break-even within that time";
+    else els.refiBreakeven.textContent = `${r.breakevenMonth} months (~${(r.breakevenMonth/12).toFixed(1)} years)`;
+    els.refiSavings.textContent = `Estimated net savings over ${keepYears} years: ${fmtUSD2(r.netSavings)} (after refinance costs)`;
   } else {
     els.refiBreakeven.textContent = "—";
-    els.refiSavings.textContent = "Enter new APR, closing costs, and keep years.";
+    els.refiSavings.textContent = "Enter new interest rate, refinance costs, and keep years.";
   }
 
   const addonsText = (loanType === "mortgage")
     ? (() => {
-        const { taxM, insM, hoaM, addons } = mortgageAddonsMonthly();
-        return `\nMortgage add-ons (monthly): tax ${fmtUSD2(taxM)}, ins ${fmtUSD2(insM)}, HOA ${fmtUSD2(hoaM)} (total ${fmtUSD2(addons)})`;
+        const { taxesMonthly, insuranceMonthly, housingFeesMonthly, addons } = mortgageAddonsMonthly();
+        return `\nMonthly housing add-ons: taxes ${fmtUSD2(taxesMonthly)}, insurance ${fmtUSD2(insuranceMonthly)}, fees ${fmtUSD2(housingFeesMonthly)} (total ${fmtUSD2(addons)})`;
       })()
     : "";
 
   lastSummary =
     `RateSense summary (${loanType})\n` +
-    `Principal: ${fmtUSD2(principal)}\nTerm: ${years} years\nAPR baseline: ${apr.toFixed(2)}%\nExtra monthly payment: ${fmtUSD2(extra)}\n` +
-    `Scenario: +${delta.toFixed(2)}% => APR ${(aprNew).toFixed(2)}%` +
+    `Loan balance: ${fmtUSD2(principal)}\nLoan length: ${years} years\nAnnual interest rate (baseline): ${apr.toFixed(2)}%\nExtra monthly payment: ${fmtUSD2(extra)}\n` +
+    `Scenario: increase by ${delta.toFixed(2)}% => annual interest rate ${(aprNew).toFixed(2)}%` +
     `${addonsText}\n\n` +
-    `Baseline monthly (P&I): ${fmtUSD2(baseMonthly)}\nBaseline payoff: ${baseSched.months} months\nBaseline interest: ${fmtUSD2(baseSched.totalInterest)}\n\n` +
-    `Scenario monthly (P&I): ${fmtUSD2(newMonthly)}\nScenario interest: ${fmtUSD2(newSched.totalInterest)}\n` +
-    `Δ monthly: ${fmtUSD2(dM)}\nΔ interest: ${fmtUSD2(dI)}\n\n` +
+    `Baseline monthly payment: ${fmtUSD2(baseMonthly)}\nBaseline payoff time: ${baseSched.months} months\nBaseline total interest: ${fmtUSD2(baseSched.totalInterest)}\n\n` +
+    `Scenario monthly payment: ${fmtUSD2(newMonthly)}\nScenario total interest: ${fmtUSD2(newSched.totalInterest)}\n` +
+    `Change in monthly payment: ${fmtUSD2(dM)}\nChange in total interest: ${fmtUSD2(dI)}\n\n` +
     `Educational only; not financial advice.`;
 
   updateReportBlocks();
 }
 
-// ---------- Reset ----------
 function resetAll() {
   els.loanType.value = "mortgage";
   els.principal.value = "";
@@ -698,7 +686,6 @@ function resetAll() {
   els.ccMode.value = "minimum";
   els.ccFixedPayment.value = "";
 
-  // Mortgage add-ons defaults
   els.annualTax.value = "";
   els.annualIns.value = "";
   els.monthlyHOA.value = "0";
@@ -719,6 +706,7 @@ function resetAll() {
   els.pitiRow.style.display = "none";
   els.basePITI.textContent = "—";
   els.newPITI.textContent = "—";
+  els.deltaPITI.textContent = "—";
   els.pitiAddons.textContent = "—";
   els.pitiDeltaAbs.textContent = "—";
   els.pitiDeltaPct.textContent = "—";
@@ -737,7 +725,7 @@ function resetAll() {
   showHideFields();
 }
 
-// ---------- Scenario Loader ----------
+// ---------- Scenarios ----------
 const scenarios = {
   mortgage350: { loanType: "mortgage", principal: 350000, years: 30, apr: 6.5, extra: 0, tax: 7200, ins: 1800, hoa: 0 },
   auto25: { loanType: "auto", principal: 25000, years: 5, apr: 7.9, extra: 0 },
@@ -774,79 +762,7 @@ function loadScenario(key) {
   window.location.hash = "#calculator";
 }
 
-// ---------- CSV ----------
-function scheduleToCSV(scheduleObj) {
-  const lines = [];
-  lines.push(["Month","Payment","Interest","Principal","Balance"].join(","));
-
-  let sumPay = 0, sumInt = 0, sumPrin = 0;
-  for (const row of scheduleObj.schedule) {
-    sumPay += row.payment;
-    sumInt += row.interest;
-    sumPrin += row.principal;
-    lines.push([row.month, row.payment.toFixed(2), row.interest.toFixed(2), row.principal.toFixed(2), row.balance.toFixed(2)].join(","));
-  }
-  lines.push("");
-  lines.push(["Totals", sumPay.toFixed(2), sumInt.toFixed(2), sumPrin.toFixed(2), ""].join(","));
-  return lines.join("\n");
-}
-
-// ---------- Events ----------
-els.loanType.addEventListener("change", showHideFields);
-els.delta.addEventListener("change", () => {
-  els.customDeltaWrap.style.display = (els.delta.value === "custom") ? "" : "none";
-});
-
-els.calcBtn.addEventListener("click", calculateAndRender);
-els.resetBtn.addEventListener("click", resetAll);
-
-els.copyBtn.addEventListener("click", () => {
-  if (!lastSummary) return setStatus("Run a calculation first.");
-  copyToClipboard(lastSummary, "Summary copied.");
-});
-
-els.shareBtn.addEventListener("click", () => {
-  const link = buildShareURL();
-  copyToClipboard(link, "Share link copied.");
-});
-
-els.csvBtn.addEventListener("click", () => {
-  if (!lastBaselineSchedule?.schedule?.length) {
-    setStatus("Run an amortized loan calc first (mortgage/auto/student).");
-    return;
-  }
-  const csv = scheduleToCSV(lastBaselineSchedule);
-  downloadText("ratesense_schedule.csv", csv, "text/csv");
-  setStatus("CSV downloaded.");
-  setTimeout(() => setStatus(""), 1500);
-});
-
-els.printBtn.addEventListener("click", () => {
-  if (!lastSummary) setStatus("Tip: run a calculation first for a complete report.");
-  updateReportBlocks();
-  window.print();
-});
-
-els.chartBalanceBtn.addEventListener("click", () => {
-  chartMode = "balance";
-  if (lastBaselineSchedule) buildChart(lastBaselineSchedule);
-});
-els.chartSplitBtn.addEventListener("click", () => {
-  chartMode = "split";
-  if (lastBaselineSchedule) buildChart(lastBaselineSchedule);
-});
-
-document.querySelectorAll("[data-scenario]").forEach(btn => {
-  btn.addEventListener("click", () => loadScenario(btn.dataset.scenario));
-});
-
-// init
-applyParamsFromURL();
-showHideFields();
-updateReportBlocks();
-// ===============================
-// COMPARE MODE
-// ===============================
+// ---------- Compare Mode ----------
 const cmp = {
   aType: $("aType"), bType: $("bType"),
   aP: $("aP"), aTerm: $("aTerm"), aApr: $("aApr"), aExtra: $("aExtra"),
@@ -856,48 +772,44 @@ const cmp = {
   btn: $("compareBtn"),
   copyBtn: $("compareCopyBtn"),
   status: $("compareStatus"),
-  tbody: $("compareTable").querySelector("tbody"),
+  tbody: $("compareTable")?.querySelector("tbody"),
 };
 
 let lastCompareSummary = "";
 
-function addonsMonthlyFor(annualTax, annualIns, hoaMonthly) {
-  const taxM = safeNum(annualTax, 0) / 12;
-  const insM = safeNum(annualIns, 0) / 12;
-  const hoaM = safeNum(hoaMonthly, 0);
-  return taxM + insM + hoaM;
+function addonsMonthlyFor(annualTax, annualIns, feesMonthly) {
+  const taxesMonthly = safeNum(annualTax, 0) / 12;
+  const insuranceMonthly = safeNum(annualIns, 0) / 12;
+  const housingFeesMonthly = safeNum(feesMonthly, 0);
+  return taxesMonthly + insuranceMonthly + housingFeesMonthly;
 }
 
-function loanMetrics(type, P, termY, apr, extra, tax, ins, hoa) {
+function loanMetrics(type, P, termY, apr, extra, tax, ins, fees) {
   const sched = amortizationSchedule(P, apr, termY, extra);
-  const monthlyPI = sched.monthlyPaymentBase;
+  const monthlyPayment = sched.monthlyPaymentBase;
   const months = sched.months;
   const totalInterest = sched.totalInterest;
 
-  let monthlyPITI = null;
+  let totalMonthlyHousingCost = null;
   if (type === "mortgage") {
-    const addons = addonsMonthlyFor(tax, ins, hoa);
-    monthlyPITI = monthlyPI + addons;
+    const addons = addonsMonthlyFor(tax, ins, fees);
+    totalMonthlyHousingCost = monthlyPayment + addons;
   }
 
-  return { monthlyPI, months, totalInterest, monthlyPITI };
+  return { monthlyPayment, months, totalInterest, totalMonthlyHousingCost };
 }
 
 function renderCompareTable(rows) {
   cmp.tbody.innerHTML = "";
   for (const r of rows) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${r.metric}</td>
-      <td>${r.a}</td>
-      <td>${r.b}</td>
-      <td>${r.diff}</td>
-    `;
+    tr.innerHTML = `<td>${r.metric}</td><td>${r.a}</td><td>${r.b}</td><td>${r.diff}</td>`;
     cmp.tbody.appendChild(tr);
   }
 }
 
 function runCompare() {
+  if (!cmp.tbody) return;
   cmp.status.textContent = "";
 
   const aType = cmp.aType.value;
@@ -913,70 +825,69 @@ function runCompare() {
   const bExtra = safeNum(cmp.bExtra.value, 0);
 
   if (!(aP > 0 && bP > 0 && aTerm > 0 && bTerm > 0 && aApr >= 0 && bApr >= 0)) {
-    cmp.status.textContent = "Fill in principal, term, and APR for both loans.";
+    cmp.status.textContent = "Fill in loan balance, length, and interest rate for both loans.";
     return;
   }
 
-  const a = loanMetrics(aType, aP, aTerm, aApr, aExtra, cmp.aTax?.value, cmp.aIns?.value, cmp.aHoa?.value);
-  const b = loanMetrics(bType, bP, bTerm, bApr, bExtra, cmp.bTax?.value, cmp.bIns?.value, cmp.bHoa?.value);
+  const A = loanMetrics(aType, aP, aTerm, aApr, aExtra, cmp.aTax?.value, cmp.aIns?.value, cmp.aHoa?.value);
+  const B = loanMetrics(bType, bP, bTerm, bApr, bExtra, cmp.bTax?.value, cmp.bIns?.value, cmp.bHoa?.value);
 
-  const rows = [];
+  const rows = [
+    {
+      metric: "Monthly loan payment",
+      a: fmtUSD2(A.monthlyPayment),
+      b: fmtUSD2(B.monthlyPayment),
+      diff: (B.monthlyPayment - A.monthlyPayment >= 0 ? "+" : "") + fmtUSD2(B.monthlyPayment - A.monthlyPayment),
+    },
+    {
+      metric: "Total interest paid",
+      a: fmtUSD2(A.totalInterest),
+      b: fmtUSD2(B.totalInterest),
+      diff: (B.totalInterest - A.totalInterest >= 0 ? "+" : "") + fmtUSD2(B.totalInterest - A.totalInterest),
+    },
+    {
+      metric: "Payoff time",
+      a: `${A.months} months`,
+      b: `${B.months} months`,
+      diff: (B.months - A.months >= 0 ? "+" : "") + `${B.months - A.months} months`,
+    },
+  ];
 
-  rows.push({
-    metric: "Monthly payment (P&I)",
-    a: fmtUSD2(a.monthlyPI),
-    b: fmtUSD2(b.monthlyPI),
-    diff: (b.monthlyPI - a.monthlyPI >= 0 ? "+" : "") + fmtUSD2(b.monthlyPI - a.monthlyPI),
-  });
-
-  rows.push({
-    metric: "Total interest",
-    a: fmtUSD2(a.totalInterest),
-    b: fmtUSD2(b.totalInterest),
-    diff: (b.totalInterest - a.totalInterest >= 0 ? "+" : "") + fmtUSD2(b.totalInterest - a.totalInterest),
-  });
-
-  rows.push({
-    metric: "Payoff time",
-    a: `${a.months} months`,
-    b: `${b.months} months`,
-    diff: (b.months - a.months >= 0 ? "+" : "") + `${b.months - a.months} months`,
-  });
-
-  // Only show PITI row if either is a mortgage
   if (aType === "mortgage" || bType === "mortgage") {
-    const aVal = (a.monthlyPITI == null) ? "—" : fmtUSD2(a.monthlyPITI);
-    const bVal = (b.monthlyPITI == null) ? "—" : fmtUSD2(b.monthlyPITI);
+    const aVal = (A.totalMonthlyHousingCost == null) ? "—" : fmtUSD2(A.totalMonthlyHousingCost);
+    const bVal = (B.totalMonthlyHousingCost == null) ? "—" : fmtUSD2(B.totalMonthlyHousingCost);
 
     let diff = "—";
-    if (a.monthlyPITI != null && b.monthlyPITI != null) {
-      diff = (b.monthlyPITI - a.monthlyPITI >= 0 ? "+" : "") + fmtUSD2(b.monthlyPITI - a.monthlyPITI);
+    if (A.totalMonthlyHousingCost != null && B.totalMonthlyHousingCost != null) {
+      diff = (B.totalMonthlyHousingCost - A.totalMonthlyHousingCost >= 0 ? "+" : "") + fmtUSD2(B.totalMonthlyHousingCost - A.totalMonthlyHousingCost);
     }
-    rows.push({ metric: "Total monthly (PITI)", a: aVal, b: bVal, diff });
+
+    rows.push({
+      metric: "Total monthly housing cost (mortgages)",
+      a: aVal,
+      b: bVal,
+      diff
+    });
   }
 
   renderCompareTable(rows);
 
   lastCompareSummary =
-    `RateSense Compare Summary\n\n` +
-    `Loan A (${aType}): P=${fmtUSD2(aP)}, term=${aTerm}y, APR=${aApr.toFixed(2)}%, extra=${fmtUSD2(aExtra)}\n` +
-    `  Monthly (P&I): ${fmtUSD2(a.monthlyPI)} | Interest: ${fmtUSD2(a.totalInterest)} | Payoff: ${a.months} months` +
-    `${a.monthlyPITI != null ? ` | PITI: ${fmtUSD2(a.monthlyPITI)}` : ""}\n\n` +
-    `Loan B (${bType}): P=${fmtUSD2(bP)}, term=${bTerm}y, APR=${bApr.toFixed(2)}%, extra=${fmtUSD2(bExtra)}\n` +
-    `  Monthly (P&I): ${fmtUSD2(b.monthlyPI)} | Interest: ${fmtUSD2(b.totalInterest)} | Payoff: ${b.months} months` +
-    `${b.monthlyPITI != null ? ` | PITI: ${fmtUSD2(b.monthlyPITI)}` : ""}\n\n` +
-    `Differences (B − A)\n` +
-    `  Monthly (P&I): ${fmtUSD2(b.monthlyPI - a.monthlyPI)}\n` +
-    `  Total interest: ${fmtUSD2(b.totalInterest - a.totalInterest)}\n` +
-    `  Payoff time: ${b.months - a.months} months\n` +
-    `\nEducational only; not financial advice.`;
+    `RateSense comparison\n\n` +
+    `Loan A (${aType}): balance ${fmtUSD2(aP)}, length ${aTerm} years, interest rate ${aApr.toFixed(2)}%, extra ${fmtUSD2(aExtra)}\n` +
+    `  Monthly payment: ${fmtUSD2(A.monthlyPayment)} | Total interest: ${fmtUSD2(A.totalInterest)} | Payoff: ${A.months} months` +
+    `${A.totalMonthlyHousingCost != null ? ` | Total monthly housing cost: ${fmtUSD2(A.totalMonthlyHousingCost)}` : ""}\n\n` +
+    `Loan B (${bType}): balance ${fmtUSD2(bP)}, length ${bTerm} years, interest rate ${bApr.toFixed(2)}%, extra ${fmtUSD2(bExtra)}\n` +
+    `  Monthly payment: ${fmtUSD2(B.monthlyPayment)} | Total interest: ${fmtUSD2(B.totalInterest)} | Payoff: ${B.months} months` +
+    `${B.totalMonthlyHousingCost != null ? ` | Total monthly housing cost: ${fmtUSD2(B.totalMonthlyHousingCost)}` : ""}\n\n` +
+    `Educational only; not financial advice.`;
 
-  cmp.status.textContent = "Compare complete.";
+  cmp.status.textContent = "Comparison complete.";
   setTimeout(() => cmp.status.textContent = "", 1500);
 }
 
 function initCompareDefaults() {
-  // Default: compare a "current" vs "refi"
+  if (!cmp.aType) return;
   cmp.aType.value = "mortgage";
   cmp.bType.value = "mortgage";
   cmp.aP.value = 350000;
@@ -997,14 +908,63 @@ function initCompareDefaults() {
   if (cmp.bHoa) cmp.bHoa.value = 0;
 }
 
+// ---------- Events ----------
+els.loanType.addEventListener("change", showHideFields);
+els.delta.addEventListener("change", () => {
+  els.customDeltaWrap.style.display = (els.delta.value === "custom") ? "" : "none";
+});
+
+els.calcBtn.addEventListener("click", calculateAndRender);
+els.resetBtn.addEventListener("click", resetAll);
+
+els.copyBtn.addEventListener("click", () => {
+  if (!lastSummary) return setStatus("Run a calculation first.");
+  copyToClipboard(lastSummary, "Summary copied.", els.status);
+});
+els.shareBtn.addEventListener("click", () => {
+  const link = buildShareURL();
+  copyToClipboard(link, "Share link copied.", els.status);
+});
+els.csvBtn.addEventListener("click", () => {
+  if (!lastBaselineSchedule?.schedule?.length) {
+    setStatus("Run a mortgage/auto/student calculation first to export a schedule.");
+    return;
+  }
+  const csv = scheduleToCSV(lastBaselineSchedule);
+  downloadText("ratesense_schedule.csv", csv, "text/csv");
+  setStatus("CSV downloaded.");
+  setTimeout(() => setStatus(""), 1500);
+});
+els.printBtn.addEventListener("click", () => {
+  if (!lastSummary) setStatus("Tip: run a calculation first for a complete report.");
+  updateReportBlocks();
+  window.print();
+});
+
+els.chartBalanceBtn.addEventListener("click", () => {
+  chartMode = "balance";
+  if (lastBaselineSchedule) buildChart(lastBaselineSchedule);
+});
+els.chartSplitBtn.addEventListener("click", () => {
+  chartMode = "split";
+  if (lastBaselineSchedule) buildChart(lastBaselineSchedule);
+});
+
+document.querySelectorAll("[data-scenario]").forEach(btn => {
+  btn.addEventListener("click", () => loadScenario(btn.dataset.scenario));
+});
+
+// Compare buttons
 if (cmp.btn) {
   cmp.btn.addEventListener("click", runCompare);
   cmp.copyBtn.addEventListener("click", () => {
-    if (!lastCompareSummary) return (cmp.status.textContent = "Run compare first.");
-    navigator.clipboard.writeText(lastCompareSummary)
-      .then(() => { cmp.status.textContent = "Compare summary copied."; setTimeout(()=>cmp.status.textContent="",1500); })
-      .catch(() => cmp.status.textContent = "Copy failed.");
+    if (!lastCompareSummary) return (cmp.status.textContent = "Run comparison first.");
+    copyToClipboard(lastCompareSummary, "Comparison copied.", cmp.status);
   });
-
   initCompareDefaults();
 }
+
+// init
+applyParamsFromURL();
+showHideFields();
+updateReportBlocks();
