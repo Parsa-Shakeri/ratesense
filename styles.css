@@ -185,6 +185,14 @@ canvas { width: 100% !important; height: 100% !important; }
 
 .footer{border-top:1px solid var(--line); padding-top:18px; padding-bottom:28px}
 
+/* Small divider in input panel */
+.divider{
+  height:1px;
+  background: rgba(255,255,255,.06);
+  margin:14px 0;
+  border-radius:999px;
+}
+
 /* ---------- PRINT STYLES ---------- */
 .print-only { display:none; }
 .no-print { display:block; }
