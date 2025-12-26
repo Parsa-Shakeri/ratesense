@@ -1,164 +1,466 @@
-// ===============================
-// COMPARE MODE
-// ===============================
-const cmp = {
-  aType: $("aType"), bType: $("bType"),
-  aP: $("aP"), aTerm: $("aTerm"), aApr: $("aApr"), aExtra: $("aExtra"),
-  bP: $("bP"), bTerm: $("bTerm"), bApr: $("bApr"), bExtra: $("bExtra"),
-  aTax: $("aTax"), aIns: $("aIns"), aHoa: $("aHoa"),
-  bTax: $("bTax"), bIns: $("bIns"), bHoa: $("bHoa"),
-  btn: $("compareBtn"),
-  copyBtn: $("compareCopyBtn"),
-  status: $("compareStatus"),
-  tbody: $("compareTable").querySelector("tbody"),
-};
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RateSense</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header class="wrap header no-print">
+    <div class="brand">
+      <div class="logo">RS</div>
+      <div>
+        <div class="title">RateSense</div>
+        <div class="subtitle">Turn interest-rate headlines into real monthly budget impacts.</div>
+      </div>
+    </div>
 
-let lastCompareSummary = "";
+    <button id="menuBtn" class="menuBtn no-print" aria-label="Open menu" aria-expanded="false">☰</button>
 
-function addonsMonthlyFor(annualTax, annualIns, hoaMonthly) {
-  const taxM = safeNum(annualTax, 0) / 12;
-  const insM = safeNum(annualIns, 0) / 12;
-  const hoaM = safeNum(hoaMonthly, 0);
-  return taxM + insM + hoaM;
-}
+    <nav id="nav" class="nav">
+      <a href="#calculator">Calculator</a>
+      <a href="#compare">Compare</a>
+      <a href="#scenarios">Scenarios</a>
+      <a href="#learn">Learn</a>
+      <a href="#about">About</a>
+    </nav>
+  </header>
 
-function loanMetrics(type, P, termY, apr, extra, tax, ins, hoa) {
-  const sched = amortizationSchedule(P, apr, termY, extra);
-  const monthlyPI = sched.monthlyPaymentBase;
-  const months = sched.months;
-  const totalInterest = sched.totalInterest;
+  <main class="wrap">
+    <!-- CALCULATOR -->
+    <section id="calculator" class="card">
+      <div class="topRow">
+        <div class="topLeft">
+          <h1>Calculator</h1>
+          <p class="muted">
+            Payments, total interest, payoff time, refinance estimate, charts, exports,
+            and (for mortgages) total monthly housing cost.
+          </p>
+        </div>
 
-  let monthlyPITI = null;
-  if (type === "mortgage") {
-    const addons = addonsMonthlyFor(tax, ins, hoa);
-    monthlyPITI = monthlyPI + addons;
-  }
+        <div class="topActions no-print">
+          <button id="copyBtn" class="btn">Copy summary</button>
+          <button id="shareBtn" class="btn">Copy share link</button>
+          <button id="csvBtn" class="btn">Download CSV</button>
+          <button id="printBtn" class="btn">Print report</button>
+          <span id="status" class="status"></span>
+        </div>
+      </div>
 
-  return { monthlyPI, months, totalInterest, monthlyPITI };
-}
+      <div class="layout">
+        <!-- LEFT: Inputs -->
+        <aside class="panel no-print">
+          <h2>Inputs</h2>
 
-function renderCompareTable(rows) {
-  cmp.tbody.innerHTML = "";
-  for (const r of rows) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${r.metric}</td>
-      <td>${r.a}</td>
-      <td>${r.b}</td>
-      <td>${r.diff}</td>
-    `;
-    cmp.tbody.appendChild(tr);
-  }
-}
+          <div class="field">
+            <label for="loanType">Loan type</label>
+            <select id="loanType">
+              <option value="mortgage">Mortgage</option>
+              <option value="auto">Auto loan</option>
+              <option value="student">Student loan</option>
+              <option value="creditcard">Credit card</option>
+            </select>
+          </div>
 
-function runCompare() {
-  cmp.status.textContent = "";
+          <div class="field">
+            <label for="principal">Loan balance (dollars)</label>
+            <input id="principal" type="number" inputmode="decimal" min="0" placeholder="350000" />
+            <div class="hint">This is the amount you borrowed (or still owe).</div>
+          </div>
 
-  const aType = cmp.aType.value;
-  const bType = cmp.bType.value;
+          <div class="field amortizedOnly">
+            <label for="termYears">Loan length (years)</label>
+            <input id="termYears" type="number" inputmode="numeric" min="1" placeholder="30" />
+          </div>
 
-  const aP = safeNum(cmp.aP.value, NaN);
-  const bP = safeNum(cmp.bP.value, NaN);
-  const aTerm = safeNum(cmp.aTerm.value, NaN);
-  const bTerm = safeNum(cmp.bTerm.value, NaN);
-  const aApr = safeNum(cmp.aApr.value, NaN);
-  const bApr = safeNum(cmp.bApr.value, NaN);
-  const aExtra = safeNum(cmp.aExtra.value, 0);
-  const bExtra = safeNum(cmp.bExtra.value, 0);
+          <div class="field">
+            <label for="apr">Annual interest rate (percent)</label>
+            <input id="apr" type="number" inputmode="decimal" min="0" step="0.01" placeholder="6.50" />
+            <div class="hint">Example: type <b>6.50</b> for 6.50%.</div>
+          </div>
 
-  if (!(aP > 0 && bP > 0 && aTerm > 0 && bTerm > 0 && aApr >= 0 && bApr >= 0)) {
-    cmp.status.textContent = "Fill in principal, term, and APR for both loans.";
-    return;
-  }
+          <div class="field amortizedOnly">
+            <label for="extraPayment">Extra amount you pay each month (optional)</label>
+            <input id="extraPayment" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
+            <div class="hint">Extra payments can reduce total interest and shorten payoff time.</div>
+          </div>
 
-  const a = loanMetrics(aType, aP, aTerm, aApr, aExtra, cmp.aTax?.value, cmp.aIns?.value, cmp.aHoa?.value);
-  const b = loanMetrics(bType, bP, bTerm, bApr, bExtra, cmp.bTax?.value, cmp.bIns?.value, cmp.bHoa?.value);
+          <div class="field">
+            <label for="delta">Interest rate change (scenario)</label>
+            <select id="delta">
+              <option value="0">No change</option>
+              <option value="0.25">Increase by 0.25%</option>
+              <option value="0.50">Increase by 0.50%</option>
+              <option value="1.00">Increase by 1.00%</option>
+              <option value="custom">Custom change…</option>
+            </select>
+          </div>
 
-  const rows = [];
+          <div class="field" id="customDeltaWrap" style="display:none;">
+            <label for="customDelta">Custom interest rate change (percent)</label>
+            <input id="customDelta" type="number" inputmode="decimal" step="0.01" placeholder="0.75" />
+          </div>
 
-  rows.push({
-    metric: "Monthly payment (P&I)",
-    a: fmtUSD2(a.monthlyPI),
-    b: fmtUSD2(b.monthlyPI),
-    diff: (b.monthlyPI - a.monthlyPI >= 0 ? "+" : "") + fmtUSD2(b.monthlyPI - a.monthlyPI),
-  });
+          <!-- Mortgage-only: monthly housing costs -->
+          <div class="divider mortgageOnly"></div>
+          <div class="mortgageOnly">
+            <h2>Monthly housing costs (mortgage)</h2>
 
-  rows.push({
-    metric: "Total interest",
-    a: fmtUSD2(a.totalInterest),
-    b: fmtUSD2(b.totalInterest),
-    diff: (b.totalInterest - a.totalInterest >= 0 ? "+" : "") + fmtUSD2(b.totalInterest - a.totalInterest),
-  });
+            <div class="field">
+              <label for="annualTax">Property taxes (per year, dollars)</label>
+              <input id="annualTax" type="number" inputmode="decimal" min="0" step="1" placeholder="7200" />
+              <div class="hint">Converted to monthly by dividing by 12.</div>
+            </div>
 
-  rows.push({
-    metric: "Payoff time",
-    a: `${a.months} months`,
-    b: `${b.months} months`,
-    diff: (b.months - a.months >= 0 ? "+" : "") + `${b.months - a.months} months`,
-  });
+            <div class="field">
+              <label for="annualIns">Homeowners insurance (per year, dollars)</label>
+              <input id="annualIns" type="number" inputmode="decimal" min="0" step="1" placeholder="1800" />
+              <div class="hint">Converted to monthly by dividing by 12.</div>
+            </div>
 
-  // Only show PITI row if either is a mortgage
-  if (aType === "mortgage" || bType === "mortgage") {
-    const aVal = (a.monthlyPITI == null) ? "—" : fmtUSD2(a.monthlyPITI);
-    const bVal = (b.monthlyPITI == null) ? "—" : fmtUSD2(b.monthlyPITI);
+            <div class="field">
+              <label for="monthlyHOA">HOA or other monthly housing fees (per month, dollars)</label>
+              <input id="monthlyHOA" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
+              <div class="hint">These affect your budget but do not change loan interest math.</div>
+            </div>
+          </div>
 
-    let diff = "—";
-    if (a.monthlyPITI != null && b.monthlyPITI != null) {
-      diff = (b.monthlyPITI - a.monthlyPITI >= 0 ? "+" : "") + fmtUSD2(b.monthlyPITI - a.monthlyPITI);
-    }
-    rows.push({ metric: "Total monthly (PITI)", a: aVal, b: bVal, diff });
-  }
+          <!-- Credit card-only inputs -->
+          <div class="divider creditOnly"></div>
+          <div class="field creditOnly">
+            <label for="ccMode">Credit card payment style</label>
+            <select id="ccMode">
+              <option value="minimum">Minimum payment (2% or $25)</option>
+              <option value="fixed">Fixed monthly payment</option>
+            </select>
+          </div>
 
-  renderCompareTable(rows);
+          <div class="field creditOnly">
+            <label for="ccFixedPayment">Fixed payment amount (dollars)</label>
+            <input id="ccFixedPayment" type="number" inputmode="decimal" min="0" placeholder="200" />
+            <div class="hint">Only used if you choose “Fixed monthly payment.”</div>
+          </div>
 
-  lastCompareSummary =
-    `RateSense Compare Summary\n\n` +
-    `Loan A (${aType}): P=${fmtUSD2(aP)}, term=${aTerm}y, APR=${aApr.toFixed(2)}%, extra=${fmtUSD2(aExtra)}\n` +
-    `  Monthly (P&I): ${fmtUSD2(a.monthlyPI)} | Interest: ${fmtUSD2(a.totalInterest)} | Payoff: ${a.months} months` +
-    `${a.monthlyPITI != null ? ` | PITI: ${fmtUSD2(a.monthlyPITI)}` : ""}\n\n` +
-    `Loan B (${bType}): P=${fmtUSD2(bP)}, term=${bTerm}y, APR=${bApr.toFixed(2)}%, extra=${fmtUSD2(bExtra)}\n` +
-    `  Monthly (P&I): ${fmtUSD2(b.monthlyPI)} | Interest: ${fmtUSD2(b.totalInterest)} | Payoff: ${b.months} months` +
-    `${b.monthlyPITI != null ? ` | PITI: ${fmtUSD2(b.monthlyPITI)}` : ""}\n\n` +
-    `Differences (B − A)\n` +
-    `  Monthly (P&I): ${fmtUSD2(b.monthlyPI - a.monthlyPI)}\n` +
-    `  Total interest: ${fmtUSD2(b.totalInterest - a.totalInterest)}\n` +
-    `  Payoff time: ${b.months - a.months} months\n` +
-    `\nEducational only; not financial advice.`;
+          <div class="actions">
+            <button id="calcBtn" class="btn primary">Calculate</button>
+            <button id="resetBtn" class="btn">Reset</button>
+          </div>
 
-  cmp.status.textContent = "Compare complete.";
-  setTimeout(() => cmp.status.textContent = "", 1500);
-}
+          <details class="assumptions">
+            <summary>What this calculator assumes</summary>
+            <ul>
+              <li>Fixed-rate loan math (educational model).</li>
+              <li>Extra payments reduce the loan balance faster.</li>
+              <li>Taxes/insurance/fees are added to your budget, not to interest math.</li>
+              <li>Educational only — not financial advice.</li>
+            </ul>
+          </details>
+        </aside>
 
-function initCompareDefaults() {
-  // Default: compare a "current" vs "refi"
-  cmp.aType.value = "mortgage";
-  cmp.bType.value = "mortgage";
-  cmp.aP.value = 350000;
-  cmp.bP.value = 350000;
-  cmp.aTerm.value = 30;
-  cmp.bTerm.value = 30;
-  cmp.aApr.value = 7.10;
-  cmp.bApr.value = 6.25;
-  cmp.aExtra.value = 0;
-  cmp.bExtra.value = 0;
+        <!-- RIGHT: Outputs -->
+        <section class="panel">
+          <h2>Results</h2>
 
-  if (cmp.aTax) cmp.aTax.value = 7200;
-  if (cmp.aIns) cmp.aIns.value = 1800;
-  if (cmp.aHoa) cmp.aHoa.value = 0;
+          <div class="results">
+            <div class="resultCard">
+              <div class="k">Baseline monthly loan payment</div>
+              <div class="v" id="baseMonthly">—</div>
+              <div class="s" id="baseNote"></div>
+            </div>
 
-  if (cmp.bTax) cmp.bTax.value = 7200;
-  if (cmp.bIns) cmp.bIns.value = 1800;
-  if (cmp.bHoa) cmp.bHoa.value = 0;
-}
+            <div class="resultCard">
+              <div class="k">Scenario monthly loan payment</div>
+              <div class="v" id="newMonthly">—</div>
+              <div class="s" id="deltaMonthly">—</div>
+            </div>
 
-if (cmp.btn) {
-  cmp.btn.addEventListener("click", runCompare);
-  cmp.copyBtn.addEventListener("click", () => {
-    if (!lastCompareSummary) return (cmp.status.textContent = "Run compare first.");
-    navigator.clipboard.writeText(lastCompareSummary)
-      .then(() => { cmp.status.textContent = "Compare summary copied."; setTimeout(()=>cmp.status.textContent="",1500); })
-      .catch(() => cmp.status.textContent = "Copy failed.");
-  });
+            <div class="resultCard">
+              <div class="k">Baseline total interest paid</div>
+              <div class="v" id="baseInterest">—</div>
+              <div class="s" id="baseTotalPaid">—</div>
+            </div>
 
-  initCompareDefaults();
-}
+            <div class="resultCard">
+              <div class="k">Scenario total interest paid</div>
+              <div class="v" id="newInterest">—</div>
+              <div class="s" id="deltaInterest">—</div>
+            </div>
+          </div>
+
+          <!-- Mortgage: total monthly housing cost -->
+          <div class="results mt mortgageOnly" id="pitiRow" style="display:none;">
+            <div class="resultCard">
+              <div class="k">Baseline total monthly housing cost</div>
+              <div class="v" id="basePITI">—</div>
+              <div class="s">Loan payment + taxes + insurance + housing fees</div>
+            </div>
+            <div class="resultCard">
+              <div class="k">Scenario total monthly housing cost</div>
+              <div class="v" id="newPITI">—</div>
+              <div class="s" id="deltaPITI">—</div>
+            </div>
+            <div class="resultCard">
+              <div class="k">Monthly taxes/insurance/fees</div>
+              <div class="v" id="pitiAddons">—</div>
+              <div class="s">These are added to your budget</div>
+            </div>
+            <div class="resultCard">
+              <div class="k">Change in total monthly housing cost</div>
+              <div class="v" id="pitiDeltaAbs">—</div>
+              <div class="s" id="pitiDeltaPct">—</div>
+            </div>
+          </div>
+
+          <div class="twoCol mt">
+            <div class="box">
+              <h3>Scenario table</h3>
+              <div class="tableWrap">
+                <table id="scenarioTable">
+                  <thead>
+                    <tr>
+                      <th>Scenario</th>
+                      <th>Annual rate</th>
+                      <th>Monthly payment</th>
+                      <th>Total interest</th>
+                      <th>Change in monthly</th>
+                      <th>Change in interest</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td colspan="6" class="muted">Run a calculation to populate scenarios.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="small muted mt8">
+                Tip: for mortgages, the table shows the loan payment (not taxes/insurance/fees). The “Total monthly housing cost” cards include those.
+              </div>
+            </div>
+
+            <div class="box">
+              <h3>Refinance estimate</h3>
+              <p class="muted small">For mortgage/auto/student loans (not credit cards).</p>
+
+              <div class="field">
+                <label for="refiNewApr">New annual interest rate (percent)</label>
+                <input id="refiNewApr" type="number" inputmode="decimal" step="0.01" placeholder="5.75" />
+              </div>
+              <div class="field">
+                <label for="refiClosingCosts">One-time refinance costs (dollars)</label>
+                <input id="refiClosingCosts" type="number" inputmode="decimal" step="1" placeholder="3000" />
+              </div>
+              <div class="field">
+                <label for="refiKeepYears">How long you will keep the loan (years)</label>
+                <input id="refiKeepYears" type="number" inputmode="decimal" step="0.5" placeholder="5" />
+              </div>
+
+              <div class="refiOut">
+                <div class="k">Estimated time to break even</div>
+                <div class="v" id="refiBreakeven">—</div>
+                <div class="s" id="refiSavings">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="box mt chartBox">
+            <div class="chartHeader">
+              <div>
+                <h3>Chart</h3>
+                <div class="muted small">Shows the baseline schedule (includes extra monthly payments if set).</div>
+              </div>
+              <div class="chartBtns no-print">
+                <button class="btn smallBtn" id="chartBalanceBtn">Remaining balance</button>
+                <button class="btn smallBtn" id="chartSplitBtn">Monthly interest vs principal</button>
+              </div>
+            </div>
+
+            <div class="chartCanvasWrap">
+              <canvas id="chart"></canvas>
+            </div>
+          </div>
+
+          <div class="footnote">Educational only. Not financial advice.</div>
+        </section>
+      </div>
+
+      <!-- PRINT REPORT -->
+      <section id="report" class="print-only">
+        <h1>RateSense Report</h1>
+        <div class="muted small" id="reportDate"></div>
+
+        <h2>Inputs</h2>
+        <pre class="reportBox" id="reportInputs">—</pre>
+
+        <h2>Results</h2>
+        <pre class="reportBox" id="reportResults">—</pre>
+
+        <h2>Refinance estimate</h2>
+        <pre class="reportBox" id="reportRefi">—</pre>
+
+        <h2>Notes</h2>
+        <div class="muted small">
+          Educational only. Not financial advice. Taxes/insurance/fees are budget add-ons and do not change loan interest math.
+        </div>
+      </section>
+    </section>
+
+    <!-- COMPARE MODE -->
+    <section id="compare" class="card">
+      <div class="topRow">
+        <div class="topLeft">
+          <h1>Compare</h1>
+          <p class="muted">
+            Compare Loan A vs Loan B side-by-side (monthly payment, total interest, payoff time, and for mortgages: total monthly housing cost).
+          </p>
+        </div>
+
+        <div class="topActions no-print">
+          <button id="compareCopyBtn" class="btn">Copy comparison</button>
+          <button id="compareBtn" class="btn primary">Run comparison</button>
+          <span id="compareStatus" class="status"></span>
+        </div>
+      </div>
+
+      <div class="compareGrid">
+        <div class="panel">
+          <h2>Loan A</h2>
+
+          <div class="field">
+            <label for="aType">Loan type</label>
+            <select id="aType">
+              <option value="mortgage">Mortgage</option>
+              <option value="auto">Auto</option>
+              <option value="student">Student</option>
+            </select>
+          </div>
+
+          <div class="field"><label for="aP">Loan balance (dollars)</label><input id="aP" type="number" /></div>
+          <div class="field"><label for="aTerm">Loan length (years)</label><input id="aTerm" type="number" /></div>
+          <div class="field"><label for="aApr">Annual interest rate (percent)</label><input id="aApr" type="number" step="0.01"/></div>
+          <div class="field"><label for="aExtra">Extra amount paid each month (optional)</label><input id="aExtra" type="number" /></div>
+
+          <div class="divider"></div>
+
+          <div class="mortgageOnlyA">
+            <h2>Monthly housing costs (Loan A)</h2>
+            <div class="field"><label for="aTax">Property taxes (per year)</label><input id="aTax" type="number" /></div>
+            <div class="field"><label for="aIns">Homeowners insurance (per year)</label><input id="aIns" type="number" /></div>
+            <div class="field"><label for="aHoa">HOA or other monthly housing fees (per month)</label><input id="aHoa" type="number" /></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Loan B</h2>
+
+          <div class="field">
+            <label for="bType">Loan type</label>
+            <select id="bType">
+              <option value="mortgage">Mortgage</option>
+              <option value="auto">Auto</option>
+              <option value="student">Student</option>
+            </select>
+          </div>
+
+          <div class="field"><label for="bP">Loan balance (dollars)</label><input id="bP" type="number" /></div>
+          <div class="field"><label for="bTerm">Loan length (years)</label><input id="bTerm" type="number" /></div>
+          <div class="field"><label for="bApr">Annual interest rate (percent)</label><input id="bApr" type="number" step="0.01"/></div>
+          <div class="field"><label for="bExtra">Extra amount paid each month (optional)</label><input id="bExtra" type="number" /></div>
+
+          <div class="divider"></div>
+
+          <div class="mortgageOnlyB">
+            <h2>Monthly housing costs (Loan B)</h2>
+            <div class="field"><label for="bTax">Property taxes (per year)</label><input id="bTax" type="number" /></div>
+            <div class="field"><label for="bIns">Homeowners insurance (per year)</label><input id="bIns" type="number" /></div>
+            <div class="field"><label for="bHoa">HOA or other monthly housing fees (per month)</label><input id="bHoa" type="number" /></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="box mt">
+        <h3>Comparison results</h3>
+        <div class="tableWrap">
+          <table id="compareTable">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Loan A</th>
+                <th>Loan B</th>
+                <th>Difference (Loan B − Loan A)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="4" class="muted">Run comparison to see results.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENARIOS -->
+    <section id="scenarios" class="card">
+      <h1>Scenarios</h1>
+      <p class="muted">Click a scenario to auto-fill the calculator inputs.</p>
+
+      <div class="scenarioGrid">
+        <button class="scenario btn" data-scenario="mortgage350">
+          <div class="scenarioTitle">Typical mortgage</div>
+          <div class="scenarioDesc">$350,000 • 30 years • 6.50%</div>
+        </button>
+        <button class="scenario btn" data-scenario="auto25">
+          <div class="scenarioTitle">Auto loan</div>
+          <div class="scenarioDesc">$25,000 • 5 years • 7.90%</div>
+        </button>
+        <button class="scenario btn" data-scenario="student40">
+          <div class="scenarioTitle">Student loan</div>
+          <div class="scenarioDesc">$40,000 • 10 years • 6.00%</div>
+        </button>
+        <button class="scenario btn" data-scenario="cc4k">
+          <div class="scenarioTitle">Credit card payoff</div>
+          <div class="scenarioDesc">$4,000 • 24.00% • $200/mo</div>
+        </button>
+      </div>
+    </section>
+
+    <!-- LEARN -->
+    <section id="learn" class="card">
+      <h1>Learn</h1>
+      <div class="learnGrid">
+        <div class="learnBox">
+          <h3>Annual interest rate</h3>
+          <p>This is the yearly interest rate. The calculator converts it into a monthly rate.</p>
+        </div>
+        <div class="learnBox">
+          <h3>Total interest paid</h3>
+          <p>This is how much money you pay in interest over the life of the loan.</p>
+        </div>
+        <div class="learnBox">
+          <h3>Total monthly housing cost (mortgages)</h3>
+          <p>
+            This includes your monthly loan payment (principal + interest) plus monthly property taxes,
+            monthly homeowners insurance, and any HOA or housing fees.
+          </p>
+        </div>
+        <div class="learnBox">
+          <h3>Extra monthly payments</h3>
+          <p>Paying extra each month can shorten the payoff time and reduce total interest.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section id="about" class="card">
+      <h1>About</h1>
+      <p>RateSense is a student-built finance calculator designed to make interest-rate changes understandable.</p>
+      <p class="muted">Educational only. Not financial advice.</p>
+    </section>
+  </main>
+
+  <footer class="wrap footer no-print">
+    <span class="muted">© RateSense • Built with HTML/CSS/JS • Educational only</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
