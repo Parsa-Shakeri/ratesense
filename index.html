@@ -1,443 +1,164 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>RateSense</title>
-  <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-  <header class="wrap header no-print">
-    <div class="brand">
-      <div class="logo">RS</div>
-      <div>
-        <div class="title">RateSense</div>
-        <div class="subtitle">Turn rate headlines into real monthly payment impacts.</div>
-      </div>
-    </div>
+// ===============================
+// COMPARE MODE
+// ===============================
+const cmp = {
+  aType: $("aType"), bType: $("bType"),
+  aP: $("aP"), aTerm: $("aTerm"), aApr: $("aApr"), aExtra: $("aExtra"),
+  bP: $("bP"), bTerm: $("bTerm"), bApr: $("bApr"), bExtra: $("bExtra"),
+  aTax: $("aTax"), aIns: $("aIns"), aHoa: $("aHoa"),
+  bTax: $("bTax"), bIns: $("bIns"), bHoa: $("bHoa"),
+  btn: $("compareBtn"),
+  copyBtn: $("compareCopyBtn"),
+  status: $("compareStatus"),
+  tbody: $("compareTable").querySelector("tbody"),
+};
 
-    <nav class="nav">
-      <a href="#calculator">Calculator</a>
-      <a href="#compare">Compare</a>
-      <a href="#scenarios">Scenarios</a>
-      <a href="#learn">Learn</a>
-      <a href="#about">About</a>
-    </nav>
-  </header>
+let lastCompareSummary = "";
 
-  <main class="wrap">
-    <!-- CALCULATOR -->
-    <section id="calculator" class="card">
-      <div class="topRow">
-        <div>
-          <h1>Calculator</h1>
-          <p class="muted">Payments, total interest, extra payments, refinance break-even, charts, exports, and PITI (mortgage).</p>
-        </div>
+function addonsMonthlyFor(annualTax, annualIns, hoaMonthly) {
+  const taxM = safeNum(annualTax, 0) / 12;
+  const insM = safeNum(annualIns, 0) / 12;
+  const hoaM = safeNum(hoaMonthly, 0);
+  return taxM + insM + hoaM;
+}
 
-        <div class="topActions no-print">
-          <button id="copyBtn" class="btn">Copy summary</button>
-          <button id="shareBtn" class="btn">Copy share link</button>
-          <button id="csvBtn" class="btn">Download CSV</button>
-          <button id="printBtn" class="btn">Print report</button>
-          <span id="status" class="status"></span>
-        </div>
-      </div>
+function loanMetrics(type, P, termY, apr, extra, tax, ins, hoa) {
+  const sched = amortizationSchedule(P, apr, termY, extra);
+  const monthlyPI = sched.monthlyPaymentBase;
+  const months = sched.months;
+  const totalInterest = sched.totalInterest;
 
-      <div class="layout">
-        <!-- LEFT: Inputs -->
-        <aside class="panel no-print">
-          <h2>Inputs</h2>
+  let monthlyPITI = null;
+  if (type === "mortgage") {
+    const addons = addonsMonthlyFor(tax, ins, hoa);
+    monthlyPITI = monthlyPI + addons;
+  }
 
-          <div class="field">
-            <label for="loanType">Loan type</label>
-            <select id="loanType">
-              <option value="mortgage">Mortgage</option>
-              <option value="auto">Auto loan</option>
-              <option value="student">Student loan</option>
-              <option value="creditcard">Credit card</option>
-            </select>
-          </div>
+  return { monthlyPI, months, totalInterest, monthlyPITI };
+}
 
-          <div class="field">
-            <label for="principal">Principal / Balance ($)</label>
-            <input id="principal" type="number" inputmode="decimal" min="0" placeholder="350000" />
-          </div>
+function renderCompareTable(rows) {
+  cmp.tbody.innerHTML = "";
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.metric}</td>
+      <td>${r.a}</td>
+      <td>${r.b}</td>
+      <td>${r.diff}</td>
+    `;
+    cmp.tbody.appendChild(tr);
+  }
+}
 
-          <div class="field amortizedOnly">
-            <label for="termYears">Term (years)</label>
-            <input id="termYears" type="number" inputmode="numeric" min="1" placeholder="30" />
-          </div>
+function runCompare() {
+  cmp.status.textContent = "";
 
-          <div class="field">
-            <label for="apr">APR (%)</label>
-            <input id="apr" type="number" inputmode="decimal" min="0" step="0.01" placeholder="6.50" />
-            <div class="hint">APR is annual interest. We convert to monthly (APR ÷ 12).</div>
-          </div>
+  const aType = cmp.aType.value;
+  const bType = cmp.bType.value;
 
-          <div class="field amortizedOnly">
-            <label for="extraPayment">Extra monthly payment ($)</label>
-            <input id="extraPayment" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
-            <div class="hint">Optional. Extra payment reduces payoff time and total interest.</div>
-          </div>
+  const aP = safeNum(cmp.aP.value, NaN);
+  const bP = safeNum(cmp.bP.value, NaN);
+  const aTerm = safeNum(cmp.aTerm.value, NaN);
+  const bTerm = safeNum(cmp.bTerm.value, NaN);
+  const aApr = safeNum(cmp.aApr.value, NaN);
+  const bApr = safeNum(cmp.bApr.value, NaN);
+  const aExtra = safeNum(cmp.aExtra.value, 0);
+  const bExtra = safeNum(cmp.bExtra.value, 0);
 
-          <div class="field">
-            <label for="delta">Rate change scenario</label>
-            <select id="delta">
-              <option value="0">No change</option>
-              <option value="0.25">+0.25%</option>
-              <option value="0.50">+0.50%</option>
-              <option value="1.00">+1.00%</option>
-              <option value="custom">Custom…</option>
-            </select>
-          </div>
+  if (!(aP > 0 && bP > 0 && aTerm > 0 && bTerm > 0 && aApr >= 0 && bApr >= 0)) {
+    cmp.status.textContent = "Fill in principal, term, and APR for both loans.";
+    return;
+  }
 
-          <div class="field" id="customDeltaWrap" style="display:none;">
-            <label for="customDelta">Custom rate change (%)</label>
-            <input id="customDelta" type="number" inputmode="decimal" step="0.01" placeholder="0.75" />
-          </div>
+  const a = loanMetrics(aType, aP, aTerm, aApr, aExtra, cmp.aTax?.value, cmp.aIns?.value, cmp.aHoa?.value);
+  const b = loanMetrics(bType, bP, bTerm, bApr, bExtra, cmp.bTax?.value, cmp.bIns?.value, cmp.bHoa?.value);
 
-          <!-- Mortgage-only: PITI -->
-          <div class="divider mortgageOnly"></div>
-          <div class="mortgageOnly">
-            <h2>PITI add-ons (mortgage)</h2>
+  const rows = [];
 
-            <div class="field">
-              <label for="annualTax">Annual property tax ($/year)</label>
-              <input id="annualTax" type="number" inputmode="decimal" min="0" step="1" placeholder="7200" />
-            </div>
+  rows.push({
+    metric: "Monthly payment (P&I)",
+    a: fmtUSD2(a.monthlyPI),
+    b: fmtUSD2(b.monthlyPI),
+    diff: (b.monthlyPI - a.monthlyPI >= 0 ? "+" : "") + fmtUSD2(b.monthlyPI - a.monthlyPI),
+  });
 
-            <div class="field">
-              <label for="annualIns">Annual homeowners insurance ($/year)</label>
-              <input id="annualIns" type="number" inputmode="decimal" min="0" step="1" placeholder="1800" />
-            </div>
+  rows.push({
+    metric: "Total interest",
+    a: fmtUSD2(a.totalInterest),
+    b: fmtUSD2(b.totalInterest),
+    diff: (b.totalInterest - a.totalInterest >= 0 ? "+" : "") + fmtUSD2(b.totalInterest - a.totalInterest),
+  });
 
-            <div class="field">
-              <label for="monthlyHOA">HOA / other monthly costs ($/mo)</label>
-              <input id="monthlyHOA" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
-            </div>
-          </div>
+  rows.push({
+    metric: "Payoff time",
+    a: `${a.months} months`,
+    b: `${b.months} months`,
+    diff: (b.months - a.months >= 0 ? "+" : "") + `${b.months - a.months} months`,
+  });
 
-          <!-- Credit card-only -->
-          <div class="divider creditOnly"></div>
-          <div class="field creditOnly">
-            <label for="ccMode">Credit card payment mode</label>
-            <select id="ccMode">
-              <option value="minimum">Minimum payment (2% or $25)</option>
-              <option value="fixed">Fixed monthly payment</option>
-            </select>
-          </div>
+  // Only show PITI row if either is a mortgage
+  if (aType === "mortgage" || bType === "mortgage") {
+    const aVal = (a.monthlyPITI == null) ? "—" : fmtUSD2(a.monthlyPITI);
+    const bVal = (b.monthlyPITI == null) ? "—" : fmtUSD2(b.monthlyPITI);
 
-          <div class="field creditOnly">
-            <label for="ccFixedPayment">Fixed payment ($)</label>
-            <input id="ccFixedPayment" type="number" inputmode="decimal" min="0" placeholder="200" />
-          </div>
+    let diff = "—";
+    if (a.monthlyPITI != null && b.monthlyPITI != null) {
+      diff = (b.monthlyPITI - a.monthlyPITI >= 0 ? "+" : "") + fmtUSD2(b.monthlyPITI - a.monthlyPITI);
+    }
+    rows.push({ metric: "Total monthly (PITI)", a: aVal, b: bVal, diff });
+  }
 
-          <div class="actions">
-            <button id="calcBtn" class="btn primary">Calculate</button>
-            <button id="resetBtn" class="btn">Reset</button>
-          </div>
+  renderCompareTable(rows);
 
-          <details class="assumptions">
-            <summary>Model assumptions</summary>
-            <ul>
-              <li>Fixed-rate amortization. Extra payments reduce principal.</li>
-              <li>PITI add-ons are budgeting add-ons, not part of interest math.</li>
-              <li>Educational only — not financial advice.</li>
-            </ul>
-          </details>
-        </aside>
+  lastCompareSummary =
+    `RateSense Compare Summary\n\n` +
+    `Loan A (${aType}): P=${fmtUSD2(aP)}, term=${aTerm}y, APR=${aApr.toFixed(2)}%, extra=${fmtUSD2(aExtra)}\n` +
+    `  Monthly (P&I): ${fmtUSD2(a.monthlyPI)} | Interest: ${fmtUSD2(a.totalInterest)} | Payoff: ${a.months} months` +
+    `${a.monthlyPITI != null ? ` | PITI: ${fmtUSD2(a.monthlyPITI)}` : ""}\n\n` +
+    `Loan B (${bType}): P=${fmtUSD2(bP)}, term=${bTerm}y, APR=${bApr.toFixed(2)}%, extra=${fmtUSD2(bExtra)}\n` +
+    `  Monthly (P&I): ${fmtUSD2(b.monthlyPI)} | Interest: ${fmtUSD2(b.totalInterest)} | Payoff: ${b.months} months` +
+    `${b.monthlyPITI != null ? ` | PITI: ${fmtUSD2(b.monthlyPITI)}` : ""}\n\n` +
+    `Differences (B − A)\n` +
+    `  Monthly (P&I): ${fmtUSD2(b.monthlyPI - a.monthlyPI)}\n` +
+    `  Total interest: ${fmtUSD2(b.totalInterest - a.totalInterest)}\n` +
+    `  Payoff time: ${b.months - a.months} months\n` +
+    `\nEducational only; not financial advice.`;
 
-        <!-- RIGHT: Outputs -->
-        <section class="panel">
-          <h2>Results</h2>
+  cmp.status.textContent = "Compare complete.";
+  setTimeout(() => cmp.status.textContent = "", 1500);
+}
 
-          <div class="results">
-            <div class="resultCard">
-              <div class="k">Baseline monthly payment</div>
-              <div class="v" id="baseMonthly">—</div>
-              <div class="s" id="baseNote"></div>
-            </div>
-            <div class="resultCard">
-              <div class="k">New monthly payment</div>
-              <div class="v" id="newMonthly">—</div>
-              <div class="s" id="deltaMonthly">—</div>
-            </div>
-            <div class="resultCard">
-              <div class="k">Baseline total interest</div>
-              <div class="v" id="baseInterest">—</div>
-              <div class="s" id="baseTotalPaid">—</div>
-            </div>
-            <div class="resultCard">
-              <div class="k">New total interest</div>
-              <div class="v" id="newInterest">—</div>
-              <div class="s" id="deltaInterest">—</div>
-            </div>
-          </div>
+function initCompareDefaults() {
+  // Default: compare a "current" vs "refi"
+  cmp.aType.value = "mortgage";
+  cmp.bType.value = "mortgage";
+  cmp.aP.value = 350000;
+  cmp.bP.value = 350000;
+  cmp.aTerm.value = 30;
+  cmp.bTerm.value = 30;
+  cmp.aApr.value = 7.10;
+  cmp.bApr.value = 6.25;
+  cmp.aExtra.value = 0;
+  cmp.bExtra.value = 0;
 
-          <div class="results mt mortgageOnly" id="pitiRow" style="display:none;">
-            <div class="resultCard">
-              <div class="k">Baseline total monthly (PITI)</div>
-              <div class="v" id="basePITI">—</div>
-              <div class="s">Tax/Ins/HOA included</div>
-            </div>
-            <div class="resultCard">
-              <div class="k">New total monthly (PITI)</div>
-              <div class="v" id="newPITI">—</div>
-              <div class="s" id="deltaPITI">—</div>
-            </div>
-            <div class="resultCard">
-              <div class="k">Monthly add-ons</div>
-              <div class="v" id="pitiAddons">—</div>
-              <div class="s">Tax + Ins + HOA</div>
-            </div>
-            <div class="resultCard">
-              <div class="k">Δ PITI (scenario)</div>
-              <div class="v" id="pitiDeltaAbs">—</div>
-              <div class="s" id="pitiDeltaPct">—</div>
-            </div>
-          </div>
+  if (cmp.aTax) cmp.aTax.value = 7200;
+  if (cmp.aIns) cmp.aIns.value = 1800;
+  if (cmp.aHoa) cmp.aHoa.value = 0;
 
-          <div class="twoCol mt">
-            <div class="box">
-              <h3>Scenario table</h3>
-              <div class="tableWrap">
-                <table id="scenarioTable">
-                  <thead>
-                    <tr>
-                      <th>Rate change</th>
-                      <th>APR</th>
-                      <th>Monthly payment</th>
-                      <th>Total interest</th>
-                      <th>Δ Monthly</th>
-                      <th>Δ Interest</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr><td colspan="6" class="muted">Run a calculation to populate scenarios.</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+  if (cmp.bTax) cmp.bTax.value = 7200;
+  if (cmp.bIns) cmp.bIns.value = 1800;
+  if (cmp.bHoa) cmp.bHoa.value = 0;
+}
 
-            <div class="box">
-              <h3>Refinance break-even</h3>
-              <p class="muted small">For amortized loans only (mortgage/auto/student).</p>
+if (cmp.btn) {
+  cmp.btn.addEventListener("click", runCompare);
+  cmp.copyBtn.addEventListener("click", () => {
+    if (!lastCompareSummary) return (cmp.status.textContent = "Run compare first.");
+    navigator.clipboard.writeText(lastCompareSummary)
+      .then(() => { cmp.status.textContent = "Compare summary copied."; setTimeout(()=>cmp.status.textContent="",1500); })
+      .catch(() => cmp.status.textContent = "Copy failed.");
+  });
 
-              <div class="field">
-                <label for="refiNewApr">New APR (%)</label>
-                <input id="refiNewApr" type="number" inputmode="decimal" step="0.01" placeholder="5.75" />
-              </div>
-              <div class="field">
-                <label for="refiClosingCosts">Closing costs ($)</label>
-                <input id="refiClosingCosts" type="number" inputmode="decimal" step="1" placeholder="3000" />
-              </div>
-              <div class="field">
-                <label for="refiKeepYears">How long will you keep the loan? (years)</label>
-                <input id="refiKeepYears" type="number" inputmode="decimal" step="0.5" placeholder="5" />
-              </div>
-
-              <div class="refiOut">
-                <div class="k">Break-even time</div>
-                <div class="v" id="refiBreakeven">—</div>
-                <div class="s" id="refiSavings">—</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="box mt chartBox">
-            <div class="chartHeader">
-              <div>
-                <h3>Charts</h3>
-                <div class="muted small">Baseline schedule (includes extra payments if set).</div>
-              </div>
-              <div class="chartBtns no-print">
-                <button class="btn smallBtn" id="chartBalanceBtn">Balance</button>
-                <button class="btn smallBtn" id="chartSplitBtn">Principal vs Interest</button>
-              </div>
-            </div>
-
-            <div class="chartCanvasWrap">
-              <canvas id="chart"></canvas>
-            </div>
-          </div>
-
-          <div class="footnote">Educational only. Not financial advice.</div>
-        </section>
-      </div>
-
-      <!-- PRINT REPORT -->
-      <section id="report" class="print-only">
-        <h1>RateSense Report</h1>
-        <div class="muted small" id="reportDate"></div>
-
-        <h2>Inputs</h2>
-        <pre class="reportBox" id="reportInputs">—</pre>
-
-        <h2>Results</h2>
-        <pre class="reportBox" id="reportResults">—</pre>
-
-        <h2>Refinance</h2>
-        <pre class="reportBox" id="reportRefi">—</pre>
-
-        <h2>Notes</h2>
-        <div class="muted small">
-          Educational only. Not financial advice. PITI add-ons are budgeting add-ons and not part of loan interest.
-        </div>
-      </section>
-    </section>
-
-    <!-- COMPARE MODE -->
-    <section id="compare" class="card">
-      <div class="topRow">
-        <div>
-          <h1>Compare Mode</h1>
-          <p class="muted">Compare Loan A vs Loan B side-by-side (payments, interest, payoff time, and mortgage PITI).</p>
-        </div>
-
-        <div class="topActions no-print">
-          <button id="compareCopyBtn" class="btn">Copy compare summary</button>
-          <button id="compareBtn" class="btn primary">Run compare</button>
-          <span id="compareStatus" class="status"></span>
-        </div>
-      </div>
-
-      <div class="compareGrid">
-        <div class="panel">
-          <h2>Loan A</h2>
-
-          <div class="field">
-            <label for="aType">Loan type</label>
-            <select id="aType">
-              <option value="mortgage">Mortgage</option>
-              <option value="auto">Auto</option>
-              <option value="student">Student</option>
-            </select>
-          </div>
-
-          <div class="field"><label for="aP">Principal ($)</label><input id="aP" type="number" /></div>
-          <div class="field"><label for="aTerm">Term (years)</label><input id="aTerm" type="number" /></div>
-          <div class="field"><label for="aApr">APR (%)</label><input id="aApr" type="number" step="0.01"/></div>
-          <div class="field"><label for="aExtra">Extra monthly ($)</label><input id="aExtra" type="number" /></div>
-
-          <div class="divider"></div>
-
-          <div class="mortgageOnlyA">
-            <h2>PITI (A)</h2>
-            <div class="field"><label for="aTax">Annual tax</label><input id="aTax" type="number" /></div>
-            <div class="field"><label for="aIns">Annual insurance</label><input id="aIns" type="number" /></div>
-            <div class="field"><label for="aHoa">HOA monthly</label><input id="aHoa" type="number" /></div>
-          </div>
-        </div>
-
-        <div class="panel">
-          <h2>Loan B</h2>
-
-          <div class="field">
-            <label for="bType">Loan type</label>
-            <select id="bType">
-              <option value="mortgage">Mortgage</option>
-              <option value="auto">Auto</option>
-              <option value="student">Student</option>
-            </select>
-          </div>
-
-          <div class="field"><label for="bP">Principal ($)</label><input id="bP" type="number" /></div>
-          <div class="field"><label for="bTerm">Term (years)</label><input id="bTerm" type="number" /></div>
-          <div class="field"><label for="bApr">APR (%)</label><input id="bApr" type="number" step="0.01"/></div>
-          <div class="field"><label for="bExtra">Extra monthly ($)</label><input id="bExtra" type="number" /></div>
-
-          <div class="divider"></div>
-
-          <div class="mortgageOnlyB">
-            <h2>PITI (B)</h2>
-            <div class="field"><label for="bTax">Annual tax</label><input id="bTax" type="number" /></div>
-            <div class="field"><label for="bIns">Annual insurance</label><input id="bIns" type="number" /></div>
-            <div class="field"><label for="bHoa">HOA monthly</label><input id="bHoa" type="number" /></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="box mt">
-        <h3>Compare results</h3>
-        <div class="tableWrap">
-          <table id="compareTable">
-            <thead>
-              <tr>
-                <th>Metric</th>
-                <th>Loan A</th>
-                <th>Loan B</th>
-                <th>Difference (B − A)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="4" class="muted">Run compare to see results.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- SCENARIOS -->
-    <section id="scenarios" class="card">
-      <h1>Scenarios</h1>
-      <p class="muted">Click a scenario to auto-fill inputs.</p>
-
-      <div class="scenarioGrid">
-        <button class="scenario btn" data-scenario="mortgage350">
-          <div class="scenarioTitle">Typical mortgage</div>
-          <div class="scenarioDesc">$350,000 • 30 years • 6.50%</div>
-        </button>
-        <button class="scenario btn" data-scenario="auto25">
-          <div class="scenarioTitle">Auto loan</div>
-          <div class="scenarioDesc">$25,000 • 5 years • 7.90%</div>
-        </button>
-        <button class="scenario btn" data-scenario="student40">
-          <div class="scenarioTitle">Student loan</div>
-          <div class="scenarioDesc">$40,000 • 10 years • 6.00%</div>
-        </button>
-        <button class="scenario btn" data-scenario="cc4k">
-          <div class="scenarioTitle">Credit card payoff</div>
-          <div class="scenarioDesc">$4,000 • 24.00% • $200/mo</div>
-        </button>
-      </div>
-    </section>
-
-    <!-- LEARN -->
-    <section id="learn" class="card">
-      <h1>Learn</h1>
-      <div class="learnGrid">
-        <div class="learnBox">
-          <h3>APR</h3>
-          <p>APR is the yearly interest rate. We convert it to a monthly rate for calculations.</p>
-        </div>
-        <div class="learnBox">
-          <h3>PITI</h3>
-          <p>For mortgages, many budgets use PITI: Principal + Interest + Taxes + Insurance (+ HOA).</p>
-        </div>
-        <div class="learnBox">
-          <h3>Total interest</h3>
-          <p>Total interest can be huge over long terms. Small APR changes can add up.</p>
-        </div>
-        <div class="learnBox">
-          <h3>Extra payments</h3>
-          <p>Extra payments reduce principal faster and cut interest costs.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ABOUT -->
-    <section id="about" class="card">
-      <h1>About</h1>
-      <p>RateSense is an educational finance calculator built as a public portfolio project.</p>
-      <p class="muted">Not financial advice.</p>
-    </section>
-  </main>
-
-  <footer class="wrap footer no-print">
-    <span class="muted">© RateSense • Built with HTML/CSS/JS • Educational only</span>
-  </footer>
-
-  <script src="app.js"></script>
-</body>
-</html>
+  initCompareDefaults();
+}
