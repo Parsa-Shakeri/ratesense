@@ -844,3 +844,167 @@ document.querySelectorAll("[data-scenario]").forEach(btn => {
 applyParamsFromURL();
 showHideFields();
 updateReportBlocks();
+// ===============================
+// COMPARE MODE
+// ===============================
+const cmp = {
+  aType: $("aType"), bType: $("bType"),
+  aP: $("aP"), aTerm: $("aTerm"), aApr: $("aApr"), aExtra: $("aExtra"),
+  bP: $("bP"), bTerm: $("bTerm"), bApr: $("bApr"), bExtra: $("bExtra"),
+  aTax: $("aTax"), aIns: $("aIns"), aHoa: $("aHoa"),
+  bTax: $("bTax"), bIns: $("bIns"), bHoa: $("bHoa"),
+  btn: $("compareBtn"),
+  copyBtn: $("compareCopyBtn"),
+  status: $("compareStatus"),
+  tbody: $("compareTable").querySelector("tbody"),
+};
+
+let lastCompareSummary = "";
+
+function addonsMonthlyFor(annualTax, annualIns, hoaMonthly) {
+  const taxM = safeNum(annualTax, 0) / 12;
+  const insM = safeNum(annualIns, 0) / 12;
+  const hoaM = safeNum(hoaMonthly, 0);
+  return taxM + insM + hoaM;
+}
+
+function loanMetrics(type, P, termY, apr, extra, tax, ins, hoa) {
+  const sched = amortizationSchedule(P, apr, termY, extra);
+  const monthlyPI = sched.monthlyPaymentBase;
+  const months = sched.months;
+  const totalInterest = sched.totalInterest;
+
+  let monthlyPITI = null;
+  if (type === "mortgage") {
+    const addons = addonsMonthlyFor(tax, ins, hoa);
+    monthlyPITI = monthlyPI + addons;
+  }
+
+  return { monthlyPI, months, totalInterest, monthlyPITI };
+}
+
+function renderCompareTable(rows) {
+  cmp.tbody.innerHTML = "";
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.metric}</td>
+      <td>${r.a}</td>
+      <td>${r.b}</td>
+      <td>${r.diff}</td>
+    `;
+    cmp.tbody.appendChild(tr);
+  }
+}
+
+function runCompare() {
+  cmp.status.textContent = "";
+
+  const aType = cmp.aType.value;
+  const bType = cmp.bType.value;
+
+  const aP = safeNum(cmp.aP.value, NaN);
+  const bP = safeNum(cmp.bP.value, NaN);
+  const aTerm = safeNum(cmp.aTerm.value, NaN);
+  const bTerm = safeNum(cmp.bTerm.value, NaN);
+  const aApr = safeNum(cmp.aApr.value, NaN);
+  const bApr = safeNum(cmp.bApr.value, NaN);
+  const aExtra = safeNum(cmp.aExtra.value, 0);
+  const bExtra = safeNum(cmp.bExtra.value, 0);
+
+  if (!(aP > 0 && bP > 0 && aTerm > 0 && bTerm > 0 && aApr >= 0 && bApr >= 0)) {
+    cmp.status.textContent = "Fill in principal, term, and APR for both loans.";
+    return;
+  }
+
+  const a = loanMetrics(aType, aP, aTerm, aApr, aExtra, cmp.aTax?.value, cmp.aIns?.value, cmp.aHoa?.value);
+  const b = loanMetrics(bType, bP, bTerm, bApr, bExtra, cmp.bTax?.value, cmp.bIns?.value, cmp.bHoa?.value);
+
+  const rows = [];
+
+  rows.push({
+    metric: "Monthly payment (P&I)",
+    a: fmtUSD2(a.monthlyPI),
+    b: fmtUSD2(b.monthlyPI),
+    diff: (b.monthlyPI - a.monthlyPI >= 0 ? "+" : "") + fmtUSD2(b.monthlyPI - a.monthlyPI),
+  });
+
+  rows.push({
+    metric: "Total interest",
+    a: fmtUSD2(a.totalInterest),
+    b: fmtUSD2(b.totalInterest),
+    diff: (b.totalInterest - a.totalInterest >= 0 ? "+" : "") + fmtUSD2(b.totalInterest - a.totalInterest),
+  });
+
+  rows.push({
+    metric: "Payoff time",
+    a: `${a.months} months`,
+    b: `${b.months} months`,
+    diff: (b.months - a.months >= 0 ? "+" : "") + `${b.months - a.months} months`,
+  });
+
+  // Only show PITI row if either is a mortgage
+  if (aType === "mortgage" || bType === "mortgage") {
+    const aVal = (a.monthlyPITI == null) ? "—" : fmtUSD2(a.monthlyPITI);
+    const bVal = (b.monthlyPITI == null) ? "—" : fmtUSD2(b.monthlyPITI);
+
+    let diff = "—";
+    if (a.monthlyPITI != null && b.monthlyPITI != null) {
+      diff = (b.monthlyPITI - a.monthlyPITI >= 0 ? "+" : "") + fmtUSD2(b.monthlyPITI - a.monthlyPITI);
+    }
+    rows.push({ metric: "Total monthly (PITI)", a: aVal, b: bVal, diff });
+  }
+
+  renderCompareTable(rows);
+
+  lastCompareSummary =
+    `RateSense Compare Summary\n\n` +
+    `Loan A (${aType}): P=${fmtUSD2(aP)}, term=${aTerm}y, APR=${aApr.toFixed(2)}%, extra=${fmtUSD2(aExtra)}\n` +
+    `  Monthly (P&I): ${fmtUSD2(a.monthlyPI)} | Interest: ${fmtUSD2(a.totalInterest)} | Payoff: ${a.months} months` +
+    `${a.monthlyPITI != null ? ` | PITI: ${fmtUSD2(a.monthlyPITI)}` : ""}\n\n` +
+    `Loan B (${bType}): P=${fmtUSD2(bP)}, term=${bTerm}y, APR=${bApr.toFixed(2)}%, extra=${fmtUSD2(bExtra)}\n` +
+    `  Monthly (P&I): ${fmtUSD2(b.monthlyPI)} | Interest: ${fmtUSD2(b.totalInterest)} | Payoff: ${b.months} months` +
+    `${b.monthlyPITI != null ? ` | PITI: ${fmtUSD2(b.monthlyPITI)}` : ""}\n\n` +
+    `Differences (B − A)\n` +
+    `  Monthly (P&I): ${fmtUSD2(b.monthlyPI - a.monthlyPI)}\n` +
+    `  Total interest: ${fmtUSD2(b.totalInterest - a.totalInterest)}\n` +
+    `  Payoff time: ${b.months - a.months} months\n` +
+    `\nEducational only; not financial advice.`;
+
+  cmp.status.textContent = "Compare complete.";
+  setTimeout(() => cmp.status.textContent = "", 1500);
+}
+
+function initCompareDefaults() {
+  // Default: compare a "current" vs "refi"
+  cmp.aType.value = "mortgage";
+  cmp.bType.value = "mortgage";
+  cmp.aP.value = 350000;
+  cmp.bP.value = 350000;
+  cmp.aTerm.value = 30;
+  cmp.bTerm.value = 30;
+  cmp.aApr.value = 7.10;
+  cmp.bApr.value = 6.25;
+  cmp.aExtra.value = 0;
+  cmp.bExtra.value = 0;
+
+  if (cmp.aTax) cmp.aTax.value = 7200;
+  if (cmp.aIns) cmp.aIns.value = 1800;
+  if (cmp.aHoa) cmp.aHoa.value = 0;
+
+  if (cmp.bTax) cmp.bTax.value = 7200;
+  if (cmp.bIns) cmp.bIns.value = 1800;
+  if (cmp.bHoa) cmp.bHoa.value = 0;
+}
+
+if (cmp.btn) {
+  cmp.btn.addEventListener("click", runCompare);
+  cmp.copyBtn.addEventListener("click", () => {
+    if (!lastCompareSummary) return (cmp.status.textContent = "Run compare first.");
+    navigator.clipboard.writeText(lastCompareSummary)
+      .then(() => { cmp.status.textContent = "Compare summary copied."; setTimeout(()=>cmp.status.textContent="",1500); })
+      .catch(() => cmp.status.textContent = "Copy failed.");
+  });
+
+  initCompareDefaults();
+}
