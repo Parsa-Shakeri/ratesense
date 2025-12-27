@@ -1015,3 +1015,118 @@ th { background: #101626 !important; color: #a9b3c7 !important; }
   body { background-attachment: scroll !important; }
 }
 
+/* =========================
+   DESKTOP FORMATTING RESET
+   Paste at END of styles.css
+   ========================= */
+
+/* Make sure desktop uses proper container width */
+.wrap{
+  max-width: 1120px !important;
+  margin: 0 auto !important;
+  padding: 16px !important;
+}
+
+/* Header layout: stable desktop alignment */
+.header{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+}
+
+/* Nav: keep it inline on desktop, not the mobile scroll style */
+.nav{
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  overflow: visible !important;
+  white-space: normal !important;
+  padding: 0 !important;
+  max-width: none !important;
+  position: static !important;
+  width: auto !important;
+}
+
+/* Undo any mobile-only nav link “pill bar” behavior on desktop */
+.nav a{
+  flex: 0 0 auto !important;
+  width: auto !important;
+}
+
+/* Main calculator 2-column layout (inputs left, results right) */
+.layout{
+  display: grid !important;
+  grid-template-columns: 360px 1fr !important;
+  gap: 14px !important;
+  align-items: start !important;
+}
+
+/* Fix “min-width forces wrap weirdness” */
+.topLeft{ min-width: 0 !important; }
+
+/* Results cards should be a clean grid on desktop */
+.results{
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+}
+
+/* The two-column section (scenario table + refi box) */
+.twoCol{
+  display: grid !important;
+  grid-template-columns: 1.25fr 1fr !important;
+  gap: 12px !important;
+}
+
+/* Tables: prevent insane stretching and keep readable */
+.tableWrap{
+  overflow: auto !important;
+}
+
+table{
+  width: 100% !important;
+  border-collapse: collapse !important;
+  min-width: 760px !important; /* keeps columns readable */
+}
+
+th, td{
+  padding: 10px 10px !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+}
+
+/* Chart: stable sizing */
+.chartCanvasWrap{
+  height: 340px !important;
+  width: 100% !important;
+}
+canvas{
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Compare section: restore 2 columns on desktop */
+.compareGrid{
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 12px !important;
+}
+
+/* =========================
+   MOBILE still stays mobile
+   (only applies under 980px)
+   ========================= */
+@media (max-width: 980px){
+  .layout{ grid-template-columns: 1fr !important; }
+  .results{ grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .twoCol{ grid-template-columns: 1fr !important; }
+  .compareGrid{ grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 520px){
+  .results{ grid-template-columns: 1fr !important; }
+  table{ min-width: 640px !important; }
+}
