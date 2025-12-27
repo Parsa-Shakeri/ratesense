@@ -234,7 +234,6 @@ function initMenu() {
     const open = els.nav.classList.toggle("open");
     els.menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
   });
-  // close menu when clicking a link (mobile)
   els.nav.querySelectorAll("a").forEach(a => {
     a.addEventListener("click", () => {
       els.nav.classList.remove("open");
@@ -621,9 +620,8 @@ function calculateAndRender() {
   lastBaselineSchedule = baseSched;
   buildChart(baseSched);
 
-  // Mortgage: total monthly housing cost
   if (loanType === "mortgage") {
-    const { taxesMonthly, insuranceMonthly, housingFeesMonthly, addons } = mortgageAddonsMonthly();
+    const { addons } = mortgageAddonsMonthly();
     const baseHousing = baseMonthly + addons;
     const newHousing = newMonthly + addons;
     const dH = newHousing - baseHousing;
@@ -639,7 +637,6 @@ function calculateAndRender() {
     }
   }
 
-  // Refinance
   const refiApr = safeNum(els.refiNewApr.value, NaN);
   const closingCosts = safeNum(els.refiClosingCosts.value, NaN);
   const keepYears = safeNum(els.refiKeepYears.value, NaN);
@@ -654,18 +651,10 @@ function calculateAndRender() {
     els.refiSavings.textContent = "Enter new interest rate, refinance costs, and keep years.";
   }
 
-  const addonsText = (loanType === "mortgage")
-    ? (() => {
-        const { taxesMonthly, insuranceMonthly, housingFeesMonthly, addons } = mortgageAddonsMonthly();
-        return `\nMonthly housing add-ons: taxes ${fmtUSD2(taxesMonthly)}, insurance ${fmtUSD2(insuranceMonthly)}, fees ${fmtUSD2(housingFeesMonthly)} (total ${fmtUSD2(addons)})`;
-      })()
-    : "";
-
   lastSummary =
     `RateSense summary (${loanType})\n` +
     `Loan balance: ${fmtUSD2(principal)}\nLoan length: ${years} years\nAnnual interest rate (baseline): ${apr.toFixed(2)}%\nExtra monthly payment: ${fmtUSD2(extra)}\n` +
-    `Scenario: increase by ${delta.toFixed(2)}% => annual interest rate ${(aprNew).toFixed(2)}%` +
-    `${addonsText}\n\n` +
+    `Scenario: increase by ${delta.toFixed(2)}% => annual interest rate ${(aprNew).toFixed(2)}%\n\n` +
     `Baseline monthly payment: ${fmtUSD2(baseMonthly)}\nBaseline payoff time: ${baseSched.months} months\nBaseline total interest: ${fmtUSD2(baseSched.totalInterest)}\n\n` +
     `Scenario monthly payment: ${fmtUSD2(newMonthly)}\nScenario total interest: ${fmtUSD2(newSched.totalInterest)}\n` +
     `Change in monthly payment: ${fmtUSD2(dM)}\nChange in total interest: ${fmtUSD2(dI)}\n\n` +
@@ -914,8 +903,8 @@ els.delta.addEventListener("change", () => {
   els.customDeltaWrap.style.display = (els.delta.value === "custom") ? "" : "none";
 });
 
-els.calcBtn.addEventListener("click", calculateAndRender);
-els.resetBtn.addEventListener("click", resetAll);
+$("calcBtn").addEventListener("click", calculateAndRender);
+$("resetBtn").addEventListener("click", resetAll);
 
 els.copyBtn.addEventListener("click", () => {
   if (!lastSummary) return setStatus("Run a calculation first.");
@@ -954,7 +943,6 @@ document.querySelectorAll("[data-scenario]").forEach(btn => {
   btn.addEventListener("click", () => loadScenario(btn.dataset.scenario));
 });
 
-// Compare buttons
 if (cmp.btn) {
   cmp.btn.addEventListener("click", runCompare);
   cmp.copyBtn.addEventListener("click", () => {
@@ -964,7 +952,6 @@ if (cmp.btn) {
   initCompareDefaults();
 }
 
-// init
 applyParamsFromURL();
 showHideFields();
 updateReportBlocks();
