@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>RateSense</title>
 
-  <!-- iOS Safari + dark theme hints -->
   <meta name="theme-color" content="#0b0d12">
   <meta name="color-scheme" content="dark">
 
@@ -13,6 +12,15 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+
+  <!-- Portfolio-ready disclaimer banner -->
+  <div class="banner">
+    <div class="wrap bannerInner">
+      <span><b>Educational tool</b> — not financial advice. Results are estimates using standard amortization formulas.</span>
+      <a class="bannerLink" href="#methodology">Methodology</a>
+    </div>
+  </div>
+
   <header class="wrap header no-print">
     <div class="brand">
       <div class="logo">RS</div>
@@ -28,6 +36,7 @@
       <a href="#calculator">Calculator</a>
       <a href="#compare">Compare</a>
       <a href="#scenarios">Scenarios</a>
+      <a href="#saved">Saved</a>
       <a href="#learn">Learn</a>
       <a href="#about">About</a>
     </nav>
@@ -57,7 +66,13 @@
       <div class="layout">
         <!-- LEFT: Inputs -->
         <aside class="panel no-print">
-          <h2>Inputs</h2>
+          <div class="panelHeader">
+            <h2>Inputs</h2>
+            <label class="switch">
+              <input type="checkbox" id="explainToggle" checked>
+              <span>Explain results</span>
+            </label>
+          </div>
 
           <div class="field">
             <label for="loanType">Loan type</label>
@@ -194,6 +209,12 @@
             </div>
           </div>
 
+          <!-- Explain Mode (upgrade #3) -->
+          <div class="box mt" id="explainBox" style="display:none;">
+            <h3>Explain (plain English)</h3>
+            <div id="explainText" class="explainText">Run a calculation to see an explanation.</div>
+          </div>
+
           <!-- Mortgage: total monthly housing cost -->
           <div class="results mt mortgageOnly" id="pitiRow" style="display:none;">
             <div class="resultCard">
@@ -268,6 +289,7 @@
             </div>
           </div>
 
+          <!-- Chart (upgrade #1) -->
           <div class="box mt chartBox">
             <div class="chartHeader">
               <div>
@@ -277,6 +299,8 @@
               <div class="chartBtns no-print">
                 <button class="btn smallBtn" id="chartBalanceBtn">Remaining balance</button>
                 <button class="btn smallBtn" id="chartSplitBtn">Monthly interest vs principal</button>
+                <button class="btn smallBtn" id="chartCumIntBtn">Cumulative interest paid</button>
+                <button class="btn smallBtn" id="chartDownloadBtn">Download chart</button>
               </div>
             </div>
 
@@ -344,12 +368,10 @@
           <div class="field"><label for="aExtra">Extra amount paid each month (optional)</label><input id="aExtra" type="number" /></div>
 
           <div class="divider"></div>
-          <div class="mortgageOnlyA">
-            <h2>Monthly housing costs (Loan A)</h2>
-            <div class="field"><label for="aTax">Property taxes (per year)</label><input id="aTax" type="number" /></div>
-            <div class="field"><label for="aIns">Homeowners insurance (per year)</label><input id="aIns" type="number" /></div>
-            <div class="field"><label for="aHoa">HOA or other monthly housing fees (per month)</label><input id="aHoa" type="number" /></div>
-          </div>
+          <h2>Monthly housing costs (Loan A)</h2>
+          <div class="field"><label for="aTax">Property taxes (per year)</label><input id="aTax" type="number" /></div>
+          <div class="field"><label for="aIns">Homeowners insurance (per year)</label><input id="aIns" type="number" /></div>
+          <div class="field"><label for="aHoa">HOA or other monthly housing fees (per month)</label><input id="aHoa" type="number" /></div>
         </div>
 
         <div class="panel">
@@ -368,12 +390,10 @@
           <div class="field"><label for="bExtra">Extra amount paid each month (optional)</label><input id="bExtra" type="number" /></div>
 
           <div class="divider"></div>
-          <div class="mortgageOnlyB">
-            <h2>Monthly housing costs (Loan B)</h2>
-            <div class="field"><label for="bTax">Property taxes (per year)</label><input id="bTax" type="number" /></div>
-            <div class="field"><label for="bIns">Homeowners insurance (per year)</label><input id="bIns" type="number" /></div>
-            <div class="field"><label for="bHoa">HOA or other monthly housing fees (per month)</label><input id="bHoa" type="number" /></div>
-          </div>
+          <h2>Monthly housing costs (Loan B)</h2>
+          <div class="field"><label for="bTax">Property taxes (per year)</label><input id="bTax" type="number" /></div>
+          <div class="field"><label for="bIns">Homeowners insurance (per year)</label><input id="bIns" type="number" /></div>
+          <div class="field"><label for="bHoa">HOA or other monthly housing fees (per month)</label><input id="bHoa" type="number" /></div>
         </div>
       </div>
 
@@ -422,6 +442,26 @@
       </div>
     </section>
 
+    <!-- SAVED (upgrade #2) -->
+    <section id="saved" class="card">
+      <div class="topRow">
+        <div class="topLeft">
+          <h1>Saved scenarios</h1>
+          <p class="muted">Save a named snapshot of your inputs. Stored locally in your browser.</p>
+        </div>
+
+        <div class="topActions no-print">
+          <input id="saveName" class="saveInput" placeholder="Name (e.g., ‘My Mortgage’)">
+          <button id="saveBtn" class="btn primary">Save current</button>
+          <span id="saveStatus" class="status"></span>
+        </div>
+      </div>
+
+      <div id="savedList" class="savedList">
+        <div class="muted">No saved scenarios yet.</div>
+      </div>
+    </section>
+
     <!-- LEARN -->
     <section id="learn" class="card">
       <h1>Learn</h1>
@@ -448,16 +488,29 @@
       </div>
     </section>
 
-    <!-- ABOUT -->
+    <!-- ABOUT / METHODOLOGY (upgrade #4) -->
     <section id="about" class="card">
       <h1>About</h1>
       <p>RateSense is a student-built finance calculator designed to make interest-rate changes understandable.</p>
       <p class="muted">Educational only. Not financial advice.</p>
+
+      <div id="methodology" class="box mt">
+        <h3>Methodology (portfolio-ready)</h3>
+        <ul class="bullets">
+          <li><b>Loan math:</b> Standard fixed-rate amortization formula for monthly payment.</li>
+          <li><b>Extra payments:</b> Added monthly and applied to principal after interest.</li>
+          <li><b>Scenario rate change:</b> Adds the selected increase to the annual interest rate.</li>
+          <li><b>Mortgage budget:</b> Adds monthly property tax + monthly insurance + monthly housing fees to the loan payment.</li>
+          <li><b>Refinance estimate:</b> Compares payment streams over a chosen “keep years” window and checks break-even vs one-time costs.</li>
+          <li><b>Limits:</b> Does not model variable rates, PMI, escrow changes, taxes, investment returns, or fees that vary over time.</li>
+        </ul>
+      </div>
     </section>
   </main>
 
   <footer class="wrap footer no-print">
     <span class="muted">© RateSense • Built with HTML/CSS/JS • Educational only</span>
+    <a class="footerLink" href="#methodology">Methodology</a>
   </footer>
 
   <script src="app.js"></script>
