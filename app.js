@@ -1,8 +1,16 @@
 "use strict";
 
+/* =========================================
+   RateSense — Upgrades #1–#4 implemented
+   ========================================= */
+
 // ---------- Helpers ----------
 const $ = (id) => document.getElementById(id);
 
+function fmtUSD0(x) {
+  if (!isFinite(x)) return "—";
+  return x.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+}
 function fmtUSD2(x) {
   if (!isFinite(x)) return "—";
   return x.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
@@ -17,7 +25,6 @@ function shortCurrency(v){
   if (abs >= 1_000) return (v/1_000).toFixed(0) + "k";
   return String(Math.round(v));
 }
-
 function downloadText(filename, text, mime="text/plain") {
   const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
@@ -29,17 +36,14 @@ function downloadText(filename, text, mime="text/plain") {
   a.remove();
   URL.revokeObjectURL(url);
 }
-
 function setParam(url, key, value) {
   if (value === null || value === undefined || value === "") url.searchParams.delete(key);
   else url.searchParams.set(key, String(value));
 }
-
 function safeNum(v, def = 0) {
   const x = parseFloat(v);
   return isFinite(x) ? x : def;
 }
-
 function copyToClipboard(text, okMsg, statusEl) {
   navigator.clipboard.writeText(text).then(() => {
     statusEl.textContent = okMsg;
@@ -210,6 +214,17 @@ const els = {
   chartCanvas: $("chart"),
   chartBalanceBtn: $("chartBalanceBtn"),
   chartSplitBtn: $("chartSplitBtn"),
+  chartCumIntBtn: $("chartCumIntBtn"),
+  chartDownloadBtn: $("chartDownloadBtn"),
+
+  explainToggle: $("explainToggle"),
+  explainBox: $("explainBox"),
+  explainText: $("explainText"),
+
+  saveName: $("saveName"),
+  saveBtn: $("saveBtn"),
+  saveList: $("savedList"),
+  saveStatus: $("saveStatus"),
 
   copyBtn: $("copyBtn"),
   shareBtn: $("shareBtn"),
@@ -340,7 +355,7 @@ function renderScenarioTableCC(balance, baseApr, mode, fixedPayment) {
   });
 }
 
-// ---------- Chart ----------
+// ---------- Chart (upgrade #1) ----------
 let chart = null;
 let chartMode = "balance";
 
@@ -353,22 +368,41 @@ function downsampleSchedule(schedule, maxPoints = 140){
   return out;
 }
 
+function cumulativeInterestSeries(schedule){
+  let cum = 0;
+  return schedule.map(r => (cum += r.interest));
+}
+
 function buildChart(scheduleObj) {
   if (!scheduleObj?.schedule?.length) return;
 
-  const s = downsampleSchedule(scheduleObj.schedule, 140);
-  const labels = s.map(x => x.month);
-  const bal = s.map(x => x.balance);
-  const intP = s.map(x => x.interest);
-  const prinP = s.map(x => x.principal);
+  const ds = downsampleSchedule(scheduleObj.schedule, 140);
+  const labels = ds.map(x => x.month);
 
-  const isBalance = (chartMode === "balance");
-  const data = isBalance
-    ? { labels, datasets: [{ label: "Remaining balance", data: bal, borderWidth: 2, pointRadius: 0, tension: 0.25, fill: true }] }
-    : { labels, datasets: [
-        { label: "Interest part of payment (monthly)", data: intP, borderWidth: 2, pointRadius: 0, tension: 0.25 },
-        { label: "Principal part of payment (monthly)", data: prinP, borderWidth: 2, pointRadius: 0, tension: 0.25 }
-      ]};
+  const bal = ds.map(x => x.balance);
+  const intP = ds.map(x => x.interest);
+  const prinP = ds.map(x => x.principal);
+
+  // compute cumulative interest from the FULL schedule, then downsample to match ds
+  const fullCum = cumulativeInterestSeries(scheduleObj.schedule);
+  const step = Math.ceil(scheduleObj.schedule.length / Math.min(140, scheduleObj.schedule.length));
+  const cumInt = [];
+  for (let i=0; i<scheduleObj.schedule.length; i+=step) cumInt.push(fullCum[i]);
+  if (cumInt.length < labels.length) cumInt.push(fullCum[fullCum.length-1]);
+
+  let data;
+  if (chartMode === "balance") {
+    data = { labels, datasets: [{ label: "Remaining balance", data: bal, borderWidth: 2, pointRadius: 0, tension: 0.25, fill: true }] };
+  } else if (chartMode === "split") {
+    data = { labels, datasets: [
+      { label: "Interest part of payment (monthly)", data: intP, borderWidth: 2, pointRadius: 0, tension: 0.25 },
+      { label: "Principal part of payment (monthly)", data: prinP, borderWidth: 2, pointRadius: 0, tension: 0.25 }
+    ]};
+  } else { // cumInterest
+    data = { labels, datasets: [
+      { label: "Cumulative interest paid", data: cumInt.slice(0, labels.length), borderWidth: 2, pointRadius: 0, tension: 0.25, fill: false }
+    ]};
+  }
 
   if (chart) chart.destroy();
 
@@ -385,17 +419,200 @@ function buildChart(scheduleObj) {
           intersect: false,
           callbacks: {
             title: (items) => `Month ${items[0].label}`,
-            label: (item) => `${item.dataset.label}: $${item.raw.toLocaleString(undefined, {maximumFractionDigits: 0})}`
+            label: (item) => `${item.dataset.label}: ${fmtUSD0(item.raw)}`
           }
         }
       },
       interaction: { mode: "index", intersect: false },
       scales: {
         x: { title: { display: true, text: "Month" }, ticks: { maxTicksLimit: 10 } },
-        y: { title: { display: true, text: "Dollars ($)" }, ticks: { callback: (v) => "$" + shortCurrency(v) } }
+        y: {
+          title: { display: true, text: "Dollars" },
+          ticks: { callback: (v) => "$" + shortCurrency(v) }
+        }
       }
     }
   });
+}
+
+function downloadChartImage() {
+  if (!chart) return setStatus("Run a calculation first to generate a chart.");
+  const url = chart.toBase64Image("image/png", 1);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ratesense_chart_${chartMode}.png`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setStatus("Chart downloaded.");
+  setTimeout(() => setStatus(""), 1200);
+}
+
+// ---------- Explain mode (upgrade #3) ----------
+function showExplain(text) {
+  if (!els.explainToggle.checked) {
+    els.explainBox.style.display = "none";
+    return;
+  }
+  els.explainBox.style.display = "";
+  els.explainText.innerHTML = text;
+}
+
+function explainAmortized({loanType, principal, years, apr, delta, aprNew, extra, baseSched, newSched, baseMonthly, newMonthly}) {
+  const dM = newMonthly - baseMonthly;
+  const dI = newSched.totalInterest - baseSched.totalInterest;
+  const extraTxt = extra > 0 ? `Because you’re paying <b>${fmtUSD2(extra)}</b> extra each month, you pay the balance down faster and reduce total interest.` :
+    `With no extra monthly payment, the loan follows a standard fixed-rate payoff schedule.`;
+
+  const headline = delta > 0
+    ? `When the annual interest rate increases by <b>${delta.toFixed(2)}%</b> (from <b>${apr.toFixed(2)}%</b> to <b>${aprNew.toFixed(2)}%</b>), the monthly payment rises because more of each payment goes to interest early in the loan.`
+    : `With no rate change, the calculator shows the baseline fixed-rate payment and total interest.`;
+
+  const payoff = `Baseline payoff time is <b>${baseSched.months}</b> months. In the scenario, payoff time is <b>${newSched.months}</b> months (extra payments can shorten payoff time).`;
+
+  const summary = `
+    ${headline}<br><br>
+    Your monthly payment changes by <b>${dM >= 0 ? "+" : ""}${fmtUSD2(dM)}</b>, and the total interest changes by <b>${dI >= 0 ? "+" : ""}${fmtUSD2(dI)}</b> over the full payoff period.<br><br>
+    ${extraTxt}<br><br>
+    ${payoff}
+  `;
+
+  return summary;
+}
+
+function explainCreditCard({principal, apr, delta, aprNew, base, next, mode, fixed}) {
+  const modeTxt = mode === "fixed"
+    ? `You chose a <b>fixed monthly payment</b> of <b>${fmtUSD2(fixed)}</b>.`
+    : `You chose <b>minimum payments</b> (a simplified rule: 2% of balance or $25).`;
+
+  const headline = delta > 0
+    ? `When the annual interest rate increases by <b>${delta.toFixed(2)}%</b> (from <b>${apr.toFixed(2)}%</b> to <b>${aprNew.toFixed(2)}%</b>), more interest accrues each month, so payoff takes longer and total interest increases.`
+    : `With no rate change, the calculator estimates payoff time and total interest using a simplified payment rule.`;
+
+  return `
+    ${headline}<br><br>
+    ${modeTxt}<br><br>
+    Baseline payoff time: <b>${base.months}</b> months, total interest: <b>${fmtUSD2(base.totalInterest)}</b>.<br>
+    Scenario payoff time: <b>${next.months}</b> months, total interest: <b>${fmtUSD2(next.totalInterest)}</b>.
+  `;
+}
+
+// ---------- Saved Scenarios (upgrade #2) ----------
+const STORAGE_KEY = "ratesense_saved_scenarios_v1";
+
+function readSaved() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+function writeSaved(list) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+
+function currentInputsSnapshot() {
+  return {
+    id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()),
+    name: (els.saveName.value || "").trim() || "Untitled",
+    ts: Date.now(),
+    values: {
+      loanType: els.loanType.value,
+      principal: els.principal.value,
+      termYears: els.termYears.value,
+      apr: els.apr.value,
+      extraPayment: els.extraPayment.value,
+      delta: els.delta.value,
+      customDelta: els.customDelta.value,
+      annualTax: els.annualTax.value,
+      annualIns: els.annualIns.value,
+      monthlyHOA: els.monthlyHOA.value,
+      ccMode: els.ccMode.value,
+      ccFixedPayment: els.ccFixedPayment.value,
+      refiNewApr: els.refiNewApr.value,
+      refiClosingCosts: els.refiClosingCosts.value,
+      refiKeepYears: els.refiKeepYears.value,
+      explainOn: !!els.explainToggle.checked,
+    }
+  };
+}
+
+function applySnapshot(snap) {
+  const v = snap.values;
+
+  els.loanType.value = v.loanType ?? "mortgage";
+  els.principal.value = v.principal ?? "";
+  els.termYears.value = v.termYears ?? "";
+  els.apr.value = v.apr ?? "";
+  els.extraPayment.value = v.extraPayment ?? "0";
+  els.delta.value = v.delta ?? "0";
+  els.customDelta.value = v.customDelta ?? "";
+  els.customDeltaWrap.style.display = (els.delta.value === "custom") ? "" : "none";
+
+  els.annualTax.value = v.annualTax ?? "";
+  els.annualIns.value = v.annualIns ?? "";
+  els.monthlyHOA.value = v.monthlyHOA ?? "0";
+
+  els.ccMode.value = v.ccMode ?? "minimum";
+  els.ccFixedPayment.value = v.ccFixedPayment ?? "";
+
+  els.refiNewApr.value = v.refiNewApr ?? "";
+  els.refiClosingCosts.value = v.refiClosingCosts ?? "";
+  els.refiKeepYears.value = v.refiKeepYears ?? "";
+
+  els.explainToggle.checked = (v.explainOn !== undefined) ? !!v.explainOn : true;
+
+  showHideFields();
+  setStatus("Loaded saved scenario. Click Calculate.");
+  window.location.hash = "#calculator";
+}
+
+function renderSavedList() {
+  const list = readSaved().sort((a,b) => b.ts - a.ts);
+  if (!list.length) {
+    els.saveList.innerHTML = `<div class="muted">No saved scenarios yet.</div>`;
+    return;
+  }
+
+  els.saveList.innerHTML = "";
+  for (const item of list) {
+    const div = document.createElement("div");
+    div.className = "savedItem";
+
+    const dt = new Date(item.ts);
+    const v = item.values;
+    const detail = `${v.loanType} • ${v.principal ? fmtUSD0(Number(v.principal)) : "—"} • ${v.apr ? (Number(v.apr).toFixed(2) + "%") : "—"}${v.termYears ? (" • " + v.termYears + "y") : ""}`;
+
+    div.innerHTML = `
+      <div class="savedMeta">
+        <div class="savedName">${escapeHtml(item.name)}</div>
+        <div class="savedDetails">${escapeHtml(detail)} • saved ${dt.toLocaleString()}</div>
+      </div>
+      <div class="savedBtns">
+        <button class="btn smallBtn" data-act="load">Load</button>
+        <button class="btn smallBtn" data-act="del">Delete</button>
+      </div>
+    `;
+
+    div.querySelector('[data-act="load"]').addEventListener("click", () => applySnapshot(item));
+    div.querySelector('[data-act="del"]').addEventListener("click", () => {
+      const next = readSaved().filter(x => x.id !== item.id);
+      writeSaved(next);
+      renderSavedList();
+      els.saveStatus.textContent = "Deleted.";
+      setTimeout(() => els.saveStatus.textContent = "", 1200);
+    });
+
+    els.saveList.appendChild(div);
+  }
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[c]));
 }
 
 // ---------- Share link ----------
@@ -591,6 +808,7 @@ function calculateAndRender() {
       `Change in interest: ${fmtUSD2(next.totalInterest - base.totalInterest)}\n` +
       `Educational only; not financial advice.`;
 
+    showExplain(explainCreditCard({principal, apr, delta, aprNew, base, next, mode, fixed}));
     updateReportBlocks();
     return;
   }
@@ -660,6 +878,7 @@ function calculateAndRender() {
     `Change in monthly payment: ${fmtUSD2(dM)}\nChange in total interest: ${fmtUSD2(dI)}\n\n` +
     `Educational only; not financial advice.`;
 
+  showExplain(explainAmortized({loanType, principal, years, apr, delta, aprNew, extra, baseSched, newSched, baseMonthly, newMonthly}));
   updateReportBlocks();
 }
 
@@ -708,6 +927,9 @@ function resetAll() {
   if (chart) { chart.destroy(); chart = null; }
   lastSummary = "";
   lastBaselineSchedule = null;
+
+  els.explainBox.style.display = "none";
+  els.explainText.textContent = "Run a calculation to see an explanation.";
 
   updateReportBlocks();
   setStatus("");
@@ -822,24 +1044,12 @@ function runCompare() {
   const B = loanMetrics(bType, bP, bTerm, bApr, bExtra, cmp.bTax?.value, cmp.bIns?.value, cmp.bHoa?.value);
 
   const rows = [
-    {
-      metric: "Monthly loan payment",
-      a: fmtUSD2(A.monthlyPayment),
-      b: fmtUSD2(B.monthlyPayment),
-      diff: (B.monthlyPayment - A.monthlyPayment >= 0 ? "+" : "") + fmtUSD2(B.monthlyPayment - A.monthlyPayment),
-    },
-    {
-      metric: "Total interest paid",
-      a: fmtUSD2(A.totalInterest),
-      b: fmtUSD2(B.totalInterest),
-      diff: (B.totalInterest - A.totalInterest >= 0 ? "+" : "") + fmtUSD2(B.totalInterest - A.totalInterest),
-    },
-    {
-      metric: "Payoff time",
-      a: `${A.months} months`,
-      b: `${B.months} months`,
-      diff: (B.months - A.months >= 0 ? "+" : "") + `${B.months - A.months} months`,
-    },
+    { metric: "Monthly loan payment", a: fmtUSD2(A.monthlyPayment), b: fmtUSD2(B.monthlyPayment),
+      diff: (B.monthlyPayment - A.monthlyPayment >= 0 ? "+" : "") + fmtUSD2(B.monthlyPayment - A.monthlyPayment) },
+    { metric: "Total interest paid", a: fmtUSD2(A.totalInterest), b: fmtUSD2(B.totalInterest),
+      diff: (B.totalInterest - A.totalInterest >= 0 ? "+" : "") + fmtUSD2(B.totalInterest - A.totalInterest) },
+    { metric: "Payoff time", a: `${A.months} months`, b: `${B.months} months`,
+      diff: (B.months - A.months >= 0 ? "+" : "") + `${B.months - A.months} months` },
   ];
 
   if (aType === "mortgage" || bType === "mortgage") {
@@ -851,12 +1061,7 @@ function runCompare() {
       diff = (B.totalMonthlyHousingCost - A.totalMonthlyHousingCost >= 0 ? "+" : "") + fmtUSD2(B.totalMonthlyHousingCost - A.totalMonthlyHousingCost);
     }
 
-    rows.push({
-      metric: "Total monthly housing cost (mortgages)",
-      a: aVal,
-      b: bVal,
-      diff
-    });
+    rows.push({ metric: "Total monthly housing cost (mortgages)", a: aVal, b: bVal, diff });
   }
 
   renderCompareTable(rows);
@@ -903,8 +1108,12 @@ els.delta.addEventListener("change", () => {
   els.customDeltaWrap.style.display = (els.delta.value === "custom") ? "" : "none";
 });
 
-$("calcBtn").addEventListener("click", calculateAndRender);
-$("resetBtn").addEventListener("click", resetAll);
+els.explainToggle.addEventListener("change", () => {
+  if (!els.explainToggle.checked) els.explainBox.style.display = "none";
+});
+
+els.calcBtn.addEventListener("click", calculateAndRender);
+els.resetBtn.addEventListener("click", resetAll);
 
 els.copyBtn.addEventListener("click", () => {
   if (!lastSummary) return setStatus("Run a calculation first.");
@@ -930,6 +1139,7 @@ els.printBtn.addEventListener("click", () => {
   window.print();
 });
 
+// Chart buttons
 els.chartBalanceBtn.addEventListener("click", () => {
   chartMode = "balance";
   if (lastBaselineSchedule) buildChart(lastBaselineSchedule);
@@ -938,11 +1148,28 @@ els.chartSplitBtn.addEventListener("click", () => {
   chartMode = "split";
   if (lastBaselineSchedule) buildChart(lastBaselineSchedule);
 });
+els.chartCumIntBtn.addEventListener("click", () => {
+  chartMode = "cumInterest";
+  if (lastBaselineSchedule) buildChart(lastBaselineSchedule);
+});
+els.chartDownloadBtn.addEventListener("click", downloadChartImage);
 
 document.querySelectorAll("[data-scenario]").forEach(btn => {
   btn.addEventListener("click", () => loadScenario(btn.dataset.scenario));
 });
 
+// Saved scenarios
+els.saveBtn.addEventListener("click", () => {
+  const snap = currentInputsSnapshot();
+  const list = readSaved();
+  list.unshift(snap);
+  writeSaved(list.slice(0, 20)); // keep it tidy
+  renderSavedList();
+  els.saveStatus.textContent = "Saved.";
+  setTimeout(() => els.saveStatus.textContent = "", 1200);
+});
+
+// Compare buttons
 if (cmp.btn) {
   cmp.btn.addEventListener("click", runCompare);
   cmp.copyBtn.addEventListener("click", () => {
@@ -952,6 +1179,8 @@ if (cmp.btn) {
   initCompareDefaults();
 }
 
+// init
 applyParamsFromURL();
 showHideFields();
 updateReportBlocks();
+renderSavedList();
