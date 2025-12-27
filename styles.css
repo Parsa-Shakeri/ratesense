@@ -2,6 +2,10 @@
 
 // ---------- Helpers ----------
 const $ = (id) => document.getElementById(id);
+html, body {
+  background-color: #0b0d12;
+  color: #e9edf5;
+}
 
 function fmtUSD2(x) {
   if (!isFinite(x)) return "—";
