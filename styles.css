@@ -959,3 +959,55 @@ if (cmp.btn) {
 applyParamsFromURL();
 showHideFields();
 updateReportBlocks();
+
+  /* =========================
+   iOS SAFARI DARK THEME PATCH
+   Paste at END of styles.css
+   ========================= */
+
+/* Tell the browser this site is dark-themed */
+:root { color-scheme: dark; }
+
+html, body {
+  background: #0b0d12 !important;
+  background-color: #0b0d12 !important;
+  color: #e9edf5 !important;
+}
+
+/* iOS Safari can “bleach” transparent layers; force solid surfaces */
+.header { background: #0b0d12 !important; }
+
+.card {
+  background: #121621 !important;   /* solid (no rgba) */
+  border-color: #1e2636 !important;
+}
+
+.panel {
+  background: #0e1220 !important;   /* solid */
+  border-color: #1e2636 !important;
+}
+
+.box, .resultCard {
+  background: #0b0f1b !important;   /* solid */
+  border-color: #1e2636 !important;
+}
+
+/* Inputs */
+.field input, .field select {
+  background: #0b0f1b !important;
+  border-color: #1e2636 !important;
+  color: #e9edf5 !important;
+}
+
+/* Links / nav */
+.nav a { color: #a9b3c7 !important; }
+.nav a:hover { color: #e9edf5 !important; background: rgba(255,255,255,.10) !important; }
+
+/* Table headers */
+th { background: #101626 !important; color: #a9b3c7 !important; }
+
+/* Prevent iOS from doing weird fixed/attachment behavior */
+@supports (-webkit-touch-callout: none) {
+  body { background-attachment: scroll !important; }
+}
+
