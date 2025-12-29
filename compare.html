@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>RateSense — Compare</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="compare.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <div class="brandMark">RS</div>
+      <div class="brandText">
+        <div class="brandTitle">RateSense</div>
+        <div class="brandSub">Rate impact, stress testing, and reporting.</div>
+      </div>
+    </a>
+
+    <button class="hamburger" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav class="nav" id="nav">
+      <a href="index.html">Calculator</a>
+      <a href="rates.html">Live Rates</a>
+      <a href="stress.html">Stress Test</a>
+      <a class="active" href="compare.html">Compare</a>
+      <a href="case-study.html">Case Study</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="pageTitle">
+      <h1>Compare</h1>
+      <p class="muted">Compare two loans side-by-side using consistent assumptions.</p>
+    </section>
+
+    <section class="card">
+      <div class="grid two">
+        <div class="subcard">
+          <h2>Loan A</h2>
+          <div class="formGrid two">
+            <div class="field"><label for="aType">Type</label>
+              <select id="aType"><option value="mortgage" selected>Mortgage</option><option value="auto">Auto</option><option value="student">Student</option></select>
+            </div>
+            <div class="field"><label for="aP">Balance</label><input id="aP" inputmode="decimal"></div>
+            <div class="field"><label for="aTerm">Years</label><input id="aTerm" inputmode="decimal"></div>
+            <div class="field"><label for="aApr">APR (%)</label><input id="aApr" inputmode="decimal"></div>
+            <div class="field"><label for="aExtra">Extra monthly</label><input id="aExtra" inputmode="decimal" value="0"></div>
+            <div class="field"><label for="aTax">Annual tax (mortgage)</label><input id="aTax" inputmode="decimal"></div>
+            <div class="field"><label for="aIns">Annual insurance (mortgage)</label><input id="aIns" inputmode="decimal"></div>
+            <div class="field"><label for="aHoa">Monthly fees (mortgage)</label><input id="aHoa" inputmode="decimal" value="0"></div>
+          </div>
+        </div>
+
+        <div class="subcard">
+          <h2>Loan B</h2>
+          <div class="formGrid two">
+            <div class="field"><label for="bType">Type</label>
+              <select id="bType"><option value="mortgage" selected>Mortgage</option><option value="auto">Auto</option><option value="student">Student</option></select>
+            </div>
+            <div class="field"><label for="bP">Balance</label><input id="bP" inputmode="decimal"></div>
+            <div class="field"><label for="bTerm">Years</label><input id="bTerm" inputmode="decimal"></div>
+            <div class="field"><label for="bApr">APR (%)</label><input id="bApr" inputmode="decimal"></div>
+            <div class="field"><label for="bExtra">Extra monthly</label><input id="bExtra" inputmode="decimal" value="0"></div>
+            <div class="field"><label for="bTax">Annual tax (mortgage)</label><input id="bTax" inputmode="decimal"></div>
+            <div class="field"><label for="bIns">Annual insurance (mortgage)</label><input id="bIns" inputmode="decimal"></div>
+            <div class="field"><label for="bHoa">Monthly fees (mortgage)</label><input id="bHoa" inputmode="decimal" value="0"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="compareBtn" class="btn primary">Compare</button>
+        <button id="compareCopyBtn" class="btn">Copy comparison</button>
+        <div id="compareStatus" class="status"></div>
+      </div>
+
+      <div class="tableWrap">
+        <table id="compareTable">
+          <thead>
+            <tr><th>Metric</th><th>Loan A</th><th>Loan B</th><th>Difference (B − A)</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <div class="muted">Educational tool only. Not financial advice.</div>
+    </footer>
+  </main>
+</body>
+</html>
