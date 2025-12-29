@@ -1,12 +1,10 @@
 "use strict";
 
 /* ============================================================
-   RateSense v2.1
-   Adds ARM Stress Mode:
-   - Fixed for X years, then adjusts every Y months
-   - Index + margin
-   - Periodic cap + lifetime cap + optional floor
-   - Optional simulate for N years (otherwise until payoff)
+   RateSense v2.2
+   ARM Stress Mode improvements:
+   - Index can change over time using Treasury history OR manual schedule
+   - Uses nearest available Treasury yield on/before each reset date
    ============================================================ */
 
 // ---------- Helpers ----------
@@ -52,7 +50,7 @@ function copyToClipboard(text, okMsg, statusEl) {
   }).catch(() => statusEl.textContent = "Copy failed (clipboard blocked).");
 }
 
-// Best-effort fetch that tries direct first, then a public CORS reader.
+// Best-effort fetch: direct, then allorigins CORS reader.
 async function fetchTextBestEffort(url) {
   try{
     const r = await fetch(url, { cache: "no-store" });
@@ -63,6 +61,34 @@ async function fetchTextBestEffort(url) {
   const r2 = await fetch(proxy, { cache: "no-store" });
   if (!r2.ok) throw new Error("Fetch blocked");
   return await r2.text();
+}
+
+function parseUSDateMMDDYYYY(s){
+  // expects MM/DD/YYYY
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  const mm = parseInt(m[1], 10);
+  const dd = parseInt(m[2], 10);
+  const yy = parseInt(m[3], 10);
+  const d = new Date(Date.UTC(yy, mm-1, dd));
+  return isFinite(d.getTime()) ? d : null;
+}
+function ymdUTC(d){
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth()+1).padStart(2,"0");
+  const day = String(d.getUTCDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+function addMonthsUTC(dateUTC, months){
+  const d = new Date(dateUTC.getTime());
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth();
+  const day = d.getUTCDate();
+  const targetMonth = m + months;
+  const nd = new Date(Date.UTC(y, targetMonth, 1));
+  const last = new Date(Date.UTC(nd.getUTCFullYear(), nd.getUTCMonth()+1, 0)).getUTCDate();
+  nd.setUTCDate(Math.min(day, last));
+  return nd;
 }
 
 // ---------- Core Math ----------
@@ -181,7 +207,7 @@ function refinanceBreakeven(principal, baseApr, newApr, years, extraMonthly, clo
   return { breakevenMonth, netSavings };
 }
 
-// ---------- Stress Test (Steps + ARM) ----------
+// ---------- Stress Test Helpers ----------
 function riskScoreFromJump(startPayment, worstPayment) {
   if (!(startPayment > 0 && worstPayment > 0)) return { score: "—", label:"" };
   const jump = (worstPayment - startPayment) / startPayment;
@@ -203,7 +229,7 @@ function buildRatePathSteps(baseApr, stepPct, everyMonths, durationMonths, capAp
   return path;
 }
 
-// This simulates payment resets when APR changes: payment recalculated to amortize remaining balance over remaining months.
+// Simulate payment resets: when APR changes, payment re-amortizes remaining balance over remaining months.
 function simulateStressAmortized(P0, termYears, baseApr, extraMonthly, ratePath, stopAfterMonths = null) {
   const totalMonths = Math.round(termYears * 12);
   const stopM = stopAfterMonths ? Math.min(totalMonths, stopAfterMonths) : totalMonths;
@@ -258,23 +284,19 @@ function simulateStressAmortized(P0, termYears, baseApr, extraMonthly, ratePath,
 }
 
 /**
- * Build ARM-style rate schedule:
- * - months 1..fixedMonths: startApr
- * - then at each adjustment month: target = index + margin
- * - apply periodic cap relative to last rate
- * - apply lifetime cap relative to startApr
- * - apply floor if set
+ * Build ARM rate map given a function that returns indexRate for each reset number.
+ * Reset number 1 = first reset after fixed period.
  */
 function buildRatePathARM({
   startApr,
   fixedYears,
   adjustEveryMonths,
-  indexRate,
   margin,
   periodicCap,
   lifetimeCap,
   floorRate,
-  simMonthsMax
+  simMonthsMax,
+  getIndexForReset
 }) {
   const fixedMonths = Math.max(0, Math.round(fixedYears * 12));
   const adjEvery = Math.max(1, Math.round(adjustEveryMonths));
@@ -283,36 +305,37 @@ function buildRatePathARM({
   const capLife = isFinite(lifetimeCap) ? Math.max(0, lifetimeCap) : NaN;
 
   const floor = isFinite(floorRate) ? floorRate : NaN;
-  const targetBase = (indexRate || 0) + (margin || 0);
 
-  const maxMonths = Math.max(1, simMonthsMax || 600); // just a safety upper bound for path
+  const maxMonths = Math.max(1, simMonthsMax || 600);
   const map = new Map();
 
   let last = startApr;
-  // fixed period
+
   for (let m=1; m<=Math.min(fixedMonths, maxMonths); m++) {
     map.set(m, startApr);
   }
 
-  // adjustment months: fixedMonths+1 .. maxMonths
+  let resetCount = 0;
+
   for (let m=fixedMonths+1; m<=maxMonths; m++) {
-    // adjust only on reset months
     const isResetMonth = ((m - (fixedMonths+1)) % adjEvery === 0);
     if (!isResetMonth) {
       map.set(m, last);
       continue;
     }
 
-    let target = targetBase;
+    resetCount += 1;
+    const idx = getIndexForReset(resetCount); // percent
+    let target = (idx || 0) + (margin || 0);
 
-    // periodic cap relative to last rate
+    // periodic cap around last
     if (isFinite(capPer)) {
       const up = last + capPer;
       const down = last - capPer;
       target = Math.min(up, Math.max(down, target));
     }
 
-    // lifetime cap relative to start
+    // lifetime cap above start
     if (isFinite(capLife)) {
       target = Math.min(startApr + capLife, target);
     }
@@ -551,6 +574,7 @@ function buildChart(scheduleObj) {
       ]};
 
   if (chart) chart.destroy();
+
   chart = new Chart(els.chartCanvas, {
     type: "line",
     data,
@@ -577,153 +601,304 @@ function buildChart(scheduleObj) {
   });
 }
 
-// ---------- Share link ----------
-function buildShareURL() {
-  const url = new URL(window.location.href);
-  url.search = "";
+// ---------- Live Rates ----------
+let lastPmms = null;
+let lastTsy = null;
 
-  const loanType = els.loanType.value;
-  setParam(url, "loan", loanType);
-  setParam(url, "p", els.principal.value);
-  setParam(url, "apr", els.apr.value);
-  setParam(url, "delta", els.delta.value);
-  if (els.delta.value === "custom") setParam(url, "cdelta", els.customDelta.value);
+const PMMS_ARCHIVE_URL = "https://www.freddiemac.com/pmms/pmms_archives";
 
-  if (loanType !== "creditcard") {
-    setParam(url, "term", els.termYears.value);
-    setParam(url, "extra", els.extraPayment.value || "0");
-    setParam(url, "refiapr", els.refiNewApr.value);
-    setParam(url, "reficost", els.refiClosingCosts.value);
-    setParam(url, "keep", els.refiKeepYears.value);
+function parseLatestPmmsFromHtml(html) {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
 
-    if (loanType === "mortgage") {
-      setParam(url, "tax", els.annualTax.value);
-      setParam(url, "ins", els.annualIns.value);
-      setParam(url, "fees", els.monthlyHOA.value);
-    }
-  } else {
-    setParam(url, "ccmode", els.ccMode.value);
-    setParam(url, "ccpay", els.ccFixedPayment.value);
+  const tables = tmp.querySelectorAll("table");
+  if (!tables.length) throw new Error("No table found");
+
+  let t = null;
+  for (const tb of tables) {
+    const txt = tb.textContent || "";
+    if (txt.includes("30") && txt.includes("FRM")) { t = tb; break; }
   }
+  if (!t) t = tables[0];
 
-  return url.toString();
+  const rows = t.querySelectorAll("tr");
+  if (rows.length < 2) throw new Error("No data rows found");
+
+  const firstDataRow = rows[1].textContent.replace(/\s+/g," ").trim();
+  const dateMatch = firstDataRow.match(/([A-Za-z]+ \d{1,2}, \d{4})/);
+  const r30 = firstDataRow.match(/30[^0-9]*([0-9]+\.[0-9]+)%/);
+  const r15 = firstDataRow.match(/15[^0-9]*([0-9]+\.[0-9]+)%/);
+
+  return {
+    date: dateMatch?.[1] || "—",
+    r30: r30 ? parseFloat(r30[1]) : NaN,
+    r15: r15 ? parseFloat(r15[1]) : NaN
+  };
 }
 
-function applyParamsFromURL() {
-  const p = new URLSearchParams(window.location.search);
-  if (!p.size) return;
+async function fetchLatestPMMS() {
+  els.pmmsStatus.textContent = "Fetching…";
+  try{
+    const html = await fetchTextBestEffort(PMMS_ARCHIVE_URL);
+    const parsed = parseLatestPmmsFromHtml(html);
+    lastPmms = parsed;
 
-  const loan = p.get("loan");
-  if (loan) els.loanType.value = loan;
+    const prod = els.pmmsProduct.value;
+    const val = (prod === "30") ? parsed.r30 : parsed.r15;
 
-  if (p.get("p")) els.principal.value = p.get("p");
-  if (p.get("apr")) els.apr.value = p.get("apr");
-  if (p.get("delta")) els.delta.value = p.get("delta");
-
-  els.customDeltaWrap.style.display = (els.delta.value === "custom") ? "" : "none";
-  if (p.get("cdelta")) els.customDelta.value = p.get("cdelta");
-
-  if (els.loanType.value !== "creditcard") {
-    if (p.get("term")) els.termYears.value = p.get("term");
-    if (p.get("extra")) els.extraPayment.value = p.get("extra");
-
-    if (p.get("refiapr")) els.refiNewApr.value = p.get("refiapr");
-    if (p.get("reficost")) els.refiClosingCosts.value = p.get("reficost");
-    if (p.get("keep")) els.refiKeepYears.value = p.get("keep");
-
-    if (els.loanType.value === "mortgage") {
-      if (p.get("tax")) els.annualTax.value = p.get("tax");
-      if (p.get("ins")) els.annualIns.value = p.get("ins");
-      if (p.get("fees")) els.monthlyHOA.value = p.get("fees");
-    }
-  } else {
-    if (p.get("ccmode")) els.ccMode.value = p.get("ccmode");
-    if (p.get("ccpay")) els.ccFixedPayment.value = p.get("ccpay");
+    els.pmmsValue.textContent = isFinite(val) ? `${val.toFixed(2)}%` : "—";
+    els.pmmsMeta.textContent = `Date: ${parsed.date}`;
+    els.pmmsStatus.textContent = "Done.";
+    setTimeout(() => els.pmmsStatus.textContent = "", 1500);
+  }catch(e){
+    els.pmmsStatus.textContent = "Could not fetch PMMS (blocked). Try again later.";
   }
-
-  showHideFields();
-  setStatus("Loaded from share link. Click Calculate.");
 }
 
-// ---------- CSV ----------
-function scheduleToCSV(scheduleObj) {
-  const lines = [];
-  lines.push(["Month","APR","Payment","Interest","Principal","Balance"].join(","));
-
-  let sumInt = 0, sumPrin = 0;
-  for (const row of scheduleObj.schedule) {
-    sumInt += row.interest;
-    sumPrin += row.principal;
-    lines.push([
-      row.month,
-      (row.apr ?? "").toString(),
-      row.payment.toFixed(2),
-      row.interest.toFixed(2),
-      row.principal.toFixed(2),
-      row.balance.toFixed(2)
-    ].join(","));
-  }
-
-  lines.push("");
-  lines.push(["Totals","","", sumInt.toFixed(2), sumPrin.toFixed(2), ""].join(","));
-  return lines.join("\n");
+function applyPmmsToApr() {
+  if (!lastPmms) { els.pmmsStatus.textContent = "Fetch PMMS first."; return; }
+  const prod = els.pmmsProduct.value;
+  const val = (prod === "30") ? lastPmms.r30 : lastPmms.r15;
+  if (!isFinite(val)) { els.pmmsStatus.textContent = "No PMMS value available."; return; }
+  els.apr.value = val.toFixed(2);
+  els.pmmsStatus.textContent = "Applied to calculator APR.";
+  setTimeout(() => els.pmmsStatus.textContent = "", 1500);
 }
 
-// ---------- Print report ----------
-function updateReportBlocks() {
-  const now = new Date();
-  if (els.reportDate) els.reportDate.textContent = `Generated: ${now.toLocaleString()}`;
+// Treasury fetch for a specific YEAR (for history mode)
+const treasuryYearCache = new Map(); // year -> {datesSorted: [ymd], byDate: Map(ymd -> { "1 Yr":x, ...})}
 
-  const loanType = els.loanType.value;
-  const delta = getDelta();
+function treasuryTextViewURLForYear(year){
+  return `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve&field_tdr_date_value=${year}`;
+}
 
-  const inputLines = [];
-  inputLines.push(`Loan type: ${loanType}`);
-  inputLines.push(`Loan balance: ${fmtUSD2(safeNum(els.principal.value, NaN))}`);
-  inputLines.push(`Annual interest rate: ${safeNum(els.apr.value, NaN).toFixed(2)}%`);
-  inputLines.push(`Scenario: increase by ${delta.toFixed(2)}%`);
+// Parse a whole year table into date->yields map
+function parseTreasuryYearFromHtml(html){
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
 
-  if (loanType !== "creditcard") {
-    inputLines.push(`Loan length: ${safeNum(els.termYears.value, NaN)} years`);
-    inputLines.push(`Extra monthly payment: ${fmtUSD2(safeNum(els.extraPayment.value, 0))}`);
-    if (loanType === "mortgage") {
-      const { taxesMonthly, insuranceMonthly, housingFeesMonthly } = mortgageAddonsMonthly();
-      inputLines.push(`Monthly housing add-ons: taxes ${fmtUSD2(taxesMonthly)}, insurance ${fmtUSD2(insuranceMonthly)}, fees ${fmtUSD2(housingFeesMonthly)}`);
+  const table = tmp.querySelector("table");
+  if (!table) throw new Error("No table found");
+
+  const headerCells = [...table.querySelectorAll("thead th")].map(th => (th.textContent||"").trim());
+  const idx = {};
+  headerCells.forEach((h,i) => { idx[h] = i; });
+
+  const rows = [...table.querySelectorAll("tbody tr")];
+  const byDate = new Map();
+
+  for (const r of rows){
+    const cells = r.querySelectorAll("td");
+    if (!cells || cells.length < 5) continue;
+    const dateTxt = (cells[0].textContent||"").trim(); // MM/DD/YYYY
+    const d = parseUSDateMMDDYYYY(dateTxt);
+    if (!d) continue;
+    const key = ymdUTC(d);
+
+    function get(label){
+      const i = idx[label];
+      if (i == null) return NaN;
+      const raw = (cells[i]?.textContent||"").trim();
+      const v = parseFloat(raw);
+      return isFinite(v) ? v : NaN;
     }
-  } else {
-    inputLines.push(`Credit card payment style: ${els.ccMode.value}`);
-    if (els.ccMode.value === "fixed") inputLines.push(`Fixed monthly payment: ${fmtUSD2(safeNum(els.ccFixedPayment.value, NaN))}`);
+
+    byDate.set(key, {
+      "1 Yr": get("1 Yr"),
+      "2 Yr": get("2 Yr"),
+      "5 Yr": get("5 Yr"),
+      "10 Yr": get("10 Yr"),
+      "30 Yr": get("30 Yr"),
+      "6 Mo": get("6 Mo"),
+      "3 Mo": get("3 Mo"),
+      "1 Mo": get("1 Mo")
+    });
   }
 
-  if (els.reportInputs) els.reportInputs.textContent = inputLines.join("\n");
+  const datesSorted = [...byDate.keys()].sort(); // YYYY-MM-DD lexicographic works
+  return { datesSorted, byDate };
+}
 
-  const resultsLines = [];
-  resultsLines.push(`Baseline monthly payment: ${els.baseMonthly.textContent}`);
-  if (els.baseNote.textContent) resultsLines.push(`${els.baseNote.textContent}`);
-  resultsLines.push(`Baseline total interest: ${els.baseInterest.textContent}`);
-  if (els.baseTotalPaid.textContent) resultsLines.push(`${els.baseTotalPaid.textContent}`);
-  resultsLines.push("");
-  resultsLines.push(`Scenario monthly payment: ${els.newMonthly.textContent}`);
-  resultsLines.push(`Change in monthly payment: ${els.deltaMonthly.textContent}`);
-  resultsLines.push(`Scenario total interest: ${els.newInterest.textContent}`);
-  resultsLines.push(`Change in total interest: ${els.deltaInterest.textContent}`);
+async function fetchTreasuryYear(year){
+  if (treasuryYearCache.has(year)) return treasuryYearCache.get(year);
+  const html = await fetchTextBestEffort(treasuryTextViewURLForYear(year));
+  const parsed = parseTreasuryYearFromHtml(html);
+  treasuryYearCache.set(year, parsed);
+  return parsed;
+}
 
-  if (loanType === "mortgage" && els.pitiRow.style.display !== "none") {
-    resultsLines.push("");
-    resultsLines.push(`Baseline total monthly housing cost: ${els.basePITI.textContent}`);
-    resultsLines.push(`Scenario total monthly housing cost: ${els.newPITI.textContent}`);
-    resultsLines.push(`Change in total monthly housing cost: ${els.pitiDeltaAbs.textContent} (${els.pitiDeltaPct.textContent})`);
+// Get yield on or before date, across needed years
+async function getTreasuryYieldOnOrBefore(dateUTC, maturityLabel){
+  // try current year, then previous year if date is early and missing
+  const y = dateUTC.getUTCFullYear();
+  const candidates = [y, y-1];
+
+  const key = ymdUTC(dateUTC);
+
+  for (const yr of candidates){
+    const data = await fetchTreasuryYear(yr);
+    // find latest date <= key
+    // datesSorted is ascending
+    let lo = 0, hi = data.datesSorted.length - 1, ans = null;
+    while (lo <= hi){
+      const mid = (lo + hi) >> 1;
+      const v = data.datesSorted[mid];
+      if (v <= key){
+        ans = v;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    if (ans){
+      const row = data.byDate.get(ans);
+      const val = row?.[maturityLabel];
+      if (isFinite(val)) return { value: val, usedDate: ans };
+    }
+  }
+  return { value: NaN, usedDate: null };
+}
+
+// “Latest” Treasury for constant mode (quick pull)
+const TSY_YIELD_URL = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve&field_tdr_date_value=2025";
+
+function parseLatestTreasuryYieldFromHtml(html) {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+
+  const table = tmp.querySelector("table");
+  if (!table) throw new Error("No table found");
+
+  const rows = [...table.querySelectorAll("tr")].slice(1);
+  if (!rows.length) throw new Error("No data rows");
+
+  let best = null;
+  for (let i=rows.length-1; i>=0; i--){
+    const cells = rows[i].querySelectorAll("td");
+    if (cells.length < 5) continue;
+    const dateTxt = (cells[0].textContent || "").trim();
+    if (/\d{2}\/\d{2}\/\d{4}/.test(dateTxt)) { best = cells; break; }
+  }
+  if (!best) throw new Error("No valid date row");
+
+  const date = (best[0].textContent || "").trim();
+  const headerCells = [...table.querySelectorAll("thead th")].map(th => (th.textContent||"").trim());
+  const map = {};
+  for (let i=0; i<headerCells.length; i++){
+    map[headerCells[i]] = i;
   }
 
-  if (els.reportResults) els.reportResults.textContent = resultsLines.join("\n");
+  function getByLabel(label){
+    const idx = map[label];
+    if (idx == null) return NaN;
+    const raw = (best[idx].textContent || "").trim();
+    const v = parseFloat(raw);
+    return isFinite(v) ? v : NaN;
+  }
 
-  const refiLines = [];
-  refiLines.push(`New annual interest rate: ${els.refiNewApr.value || "—"}`);
-  refiLines.push(`One-time refinance costs: ${els.refiClosingCosts.value ? fmtUSD2(safeNum(els.refiClosingCosts.value, 0)) : "—"}`);
-  refiLines.push(`Keep years: ${els.refiKeepYears.value || "—"}`);
-  refiLines.push(`Estimated break-even: ${els.refiBreakeven.textContent}`);
-  refiLines.push(`Estimated savings: ${els.refiSavings.textContent}`);
-  if (els.reportRefi) els.reportRefi.textContent = refiLines.join("\n");
+  return {
+    date,
+    values: {
+      "1 Mo": getByLabel("1 Mo"),
+      "3 Mo": getByLabel("3 Mo"),
+      "6 Mo": getByLabel("6 Mo"),
+      "1 Yr": getByLabel("1 Yr"),
+      "2 Yr": getByLabel("2 Yr"),
+      "5 Yr": getByLabel("5 Yr"),
+      "10 Yr": getByLabel("10 Yr"),
+      "30 Yr": getByLabel("30 Yr"),
+    }
+  };
+}
+
+async function fetchLatestTreasuryYield() {
+  els.tsyStatus.textContent = "Fetching…";
+  try{
+    const html = await fetchTextBestEffort(TSY_YIELD_URL);
+    const parsed = parseLatestTreasuryYieldFromHtml(html);
+    lastTsy = parsed;
+
+    const label = els.tsyMaturity.value;
+    const val = parsed.values[label];
+
+    els.tsyValue.textContent = isFinite(val) ? `${val.toFixed(2)}%` : "—";
+    els.tsyMeta.textContent = `Date: ${parsed.date}`;
+    els.tsyStatus.textContent = "Done.";
+    setTimeout(() => els.tsyStatus.textContent = "", 1500);
+
+    syncArmIndexFromTreasuryConstant();
+  }catch(e){
+    els.tsyStatus.textContent = "Could not fetch Treasury yields (blocked). Try again later.";
+  }
+}
+
+function applyTsyToApr() {
+  if (!lastTsy) { els.tsyStatus.textContent = "Fetch Treasury yields first."; return; }
+  const label = els.tsyMaturity.value;
+  const val = lastTsy.values[label];
+  if (!isFinite(val)) { els.tsyStatus.textContent = "No yield available."; return; }
+  els.apr.value = val.toFixed(2);
+  els.tsyStatus.textContent = "Applied to calculator APR.";
+  setTimeout(() => els.tsyStatus.textContent = "", 1500);
+}
+
+// ---------- PDF Export ----------
+async function downloadPDFReport() {
+  if (!window.jspdf?.jsPDF) {
+    setStatus("PDF library not loaded yet. Try again in 2 seconds.");
+    return;
+  }
+  if (!lastSummary) setStatus("Tip: run a calculation first for a complete report.");
+
+  updateReportBlocks();
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"letter" });
+
+  const margin = 36;
+  let y = 44;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("RateSense Report", margin, y);
+  y += 18;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text((els.reportDate?.textContent || ""), margin, y);
+  y += 16;
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Inputs", margin, y); y += 12;
+  doc.setFont("helvetica", "normal");
+  doc.text((els.reportInputs?.textContent || "").split("\n"), margin, y);
+  y += 12 + ((els.reportInputs?.textContent || "").split("\n").length * 12);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Results", margin, y); y += 12;
+  doc.setFont("helvetica", "normal");
+  doc.text((els.reportResults?.textContent || "").split("\n"), margin, y);
+  y += 12 + ((els.reportResults?.textContent || "").split("\n").length * 12);
+
+  doc.setFont("helvetica", "bold");
+  doc.text("Refinance (optional)", margin, y); y += 12;
+  doc.setFont("helvetica", "normal");
+  doc.text((els.reportRefi?.textContent || "").split("\n"), margin, y);
+
+  try{
+    if (chart && els.chartCanvas) {
+      const img = els.chartCanvas.toDataURL("image/png", 1.0);
+      doc.addPage();
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text("Chart", margin, 50);
+      doc.addImage(img, "PNG", margin, 70, 540, 300);
+    }
+  }catch(_){ /* ignore */ }
+
+  doc.save("ratesense_report.pdf");
+  setStatus("PDF downloaded.");
+  setTimeout(() => setStatus(""), 1500);
 }
 
 // ---------- Main calculator ----------
@@ -892,212 +1067,530 @@ function resetAll() {
   showHideFields();
 }
 
-// ---------- Live Rates ----------
-let lastPmms = null;
-let lastTsy = null;
+// ---------- Report blocks ----------
+function updateReportBlocks() {
+  const now = new Date();
+  if (els.reportDate) els.reportDate.textContent = `Generated: ${now.toLocaleString()}`;
 
-const PMMS_ARCHIVE_URL = "https://www.freddiemac.com/pmms/pmms_archives";
+  const loanType = els.loanType.value;
+  const delta = getDelta();
 
-// Parse latest row best-effort
-function parseLatestPmmsFromHtml(html) {
-  const tmp = document.createElement("div");
-  tmp.innerHTML = html;
+  const inputLines = [];
+  inputLines.push(`Loan type: ${loanType}`);
+  inputLines.push(`Loan balance: ${fmtUSD2(safeNum(els.principal.value, NaN))}`);
+  inputLines.push(`Annual interest rate: ${safeNum(els.apr.value, NaN).toFixed(2)}%`);
+  inputLines.push(`Scenario: increase by ${delta.toFixed(2)}%`);
 
-  const tables = tmp.querySelectorAll("table");
-  if (!tables.length) throw new Error("No table found");
-
-  let t = null;
-  for (const tb of tables) {
-    const txt = tb.textContent || "";
-    if (txt.includes("30") && txt.includes("FRM")) { t = tb; break; }
-  }
-  if (!t) t = tables[0];
-
-  const rows = t.querySelectorAll("tr");
-  if (rows.length < 2) throw new Error("No data rows found");
-
-  const firstDataRow = rows[1].textContent.replace(/\s+/g," ").trim();
-  const dateMatch = firstDataRow.match(/([A-Za-z]+ \d{1,2}, \d{4})/);
-  const r30 = firstDataRow.match(/30[^0-9]*([0-9]+\.[0-9]+)%/);
-  const r15 = firstDataRow.match(/15[^0-9]*([0-9]+\.[0-9]+)%/);
-
-  return {
-    date: dateMatch?.[1] || "—",
-    r30: r30 ? parseFloat(r30[1]) : NaN,
-    r15: r15 ? parseFloat(r15[1]) : NaN
-  };
-}
-
-async function fetchLatestPMMS() {
-  els.pmmsStatus.textContent = "Fetching…";
-  try{
-    const html = await fetchTextBestEffort(PMMS_ARCHIVE_URL);
-    const parsed = parseLatestPmmsFromHtml(html);
-    lastPmms = parsed;
-
-    const prod = els.pmmsProduct.value;
-    const val = (prod === "30") ? parsed.r30 : parsed.r15;
-
-    els.pmmsValue.textContent = isFinite(val) ? `${val.toFixed(2)}%` : "—";
-    els.pmmsMeta.textContent = `Date: ${parsed.date}`;
-    els.pmmsStatus.textContent = "Done.";
-    setTimeout(() => els.pmmsStatus.textContent = "", 1500);
-  }catch(e){
-    els.pmmsStatus.textContent = "Could not fetch PMMS (blocked). Try again later.";
-  }
-}
-
-function applyPmmsToApr() {
-  if (!lastPmms) { els.pmmsStatus.textContent = "Fetch PMMS first."; return; }
-  const prod = els.pmmsProduct.value;
-  const val = (prod === "30") ? lastPmms.r30 : lastPmms.r15;
-  if (!isFinite(val)) { els.pmmsStatus.textContent = "No PMMS value available."; return; }
-  els.apr.value = val.toFixed(2);
-  els.pmmsStatus.textContent = "Applied to calculator APR.";
-  setTimeout(() => els.pmmsStatus.textContent = "", 1500);
-}
-
-// Treasury page (year-labeled; update if needed)
-const TSY_YIELD_URL = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve&field_tdr_date_value=2025";
-
-function parseLatestTreasuryYieldFromHtml(html) {
-  const tmp = document.createElement("div");
-  tmp.innerHTML = html;
-
-  const table = tmp.querySelector("table");
-  if (!table) throw new Error("No table found");
-
-  const rows = [...table.querySelectorAll("tr")].slice(1);
-  if (!rows.length) throw new Error("No data rows");
-
-  let best = null;
-  for (let i=rows.length-1; i>=0; i--){
-    const cells = rows[i].querySelectorAll("td");
-    if (cells.length < 5) continue;
-    const dateTxt = (cells[0].textContent || "").trim();
-    if (/\d{2}\/\d{2}\/\d{4}/.test(dateTxt)) { best = cells; break; }
-  }
-  if (!best) throw new Error("No valid date row");
-
-  const date = (best[0].textContent || "").trim();
-  const headerCells = [...table.querySelectorAll("thead th")].map(th => (th.textContent||"").trim());
-  const map = {};
-  for (let i=0; i<headerCells.length; i++){
-    map[headerCells[i]] = i;
-  }
-
-  function getByLabel(label){
-    const idx = map[label];
-    if (idx == null) return NaN;
-    const raw = (best[idx].textContent || "").trim();
-    const v = parseFloat(raw);
-    return isFinite(v) ? v : NaN;
-  }
-
-  return {
-    date,
-    values: {
-      "1 Mo": getByLabel("1 Mo"),
-      "3 Mo": getByLabel("3 Mo"),
-      "6 Mo": getByLabel("6 Mo"),
-      "1 Yr": getByLabel("1 Yr"),
-      "2 Yr": getByLabel("2 Yr"),
-      "5 Yr": getByLabel("5 Yr"),
-      "10 Yr": getByLabel("10 Yr"),
-      "30 Yr": getByLabel("30 Yr"),
+  if (loanType !== "creditcard") {
+    inputLines.push(`Loan length: ${safeNum(els.termYears.value, NaN)} years`);
+    inputLines.push(`Extra monthly payment: ${fmtUSD2(safeNum(els.extraPayment.value, 0))}`);
+    if (loanType === "mortgage") {
+      const { taxesMonthly, insuranceMonthly, housingFeesMonthly } = mortgageAddonsMonthly();
+      inputLines.push(`Monthly housing add-ons: taxes ${fmtUSD2(taxesMonthly)}, insurance ${fmtUSD2(insuranceMonthly)}, fees ${fmtUSD2(housingFeesMonthly)}`);
     }
-  };
+  } else {
+    inputLines.push(`Credit card payment style: ${els.ccMode.value}`);
+    if (els.ccMode.value === "fixed") inputLines.push(`Fixed monthly payment: ${fmtUSD2(safeNum(els.ccFixedPayment.value, NaN))}`);
+  }
+
+  if (els.reportInputs) els.reportInputs.textContent = inputLines.join("\n");
+
+  const resultsLines = [];
+  resultsLines.push(`Baseline monthly payment: ${els.baseMonthly.textContent}`);
+  if (els.baseNote.textContent) resultsLines.push(`${els.baseNote.textContent}`);
+  resultsLines.push(`Baseline total interest: ${els.baseInterest.textContent}`);
+  if (els.baseTotalPaid.textContent) resultsLines.push(`${els.baseTotalPaid.textContent}`);
+  resultsLines.push("");
+  resultsLines.push(`Scenario monthly payment: ${els.newMonthly.textContent}`);
+  resultsLines.push(`Change in monthly payment: ${els.deltaMonthly.textContent}`);
+  resultsLines.push(`Scenario total interest: ${els.newInterest.textContent}`);
+  resultsLines.push(`Change in total interest: ${els.deltaInterest.textContent}`);
+
+  if (loanType === "mortgage" && els.pitiRow.style.display !== "none") {
+    resultsLines.push("");
+    resultsLines.push(`Baseline total monthly housing cost: ${els.basePITI.textContent}`);
+    resultsLines.push(`Scenario total monthly housing cost: ${els.newPITI.textContent}`);
+    resultsLines.push(`Change in total monthly housing cost: ${els.pitiDeltaAbs.textContent} (${els.pitiDeltaPct.textContent})`);
+  }
+
+  if (els.reportResults) els.reportResults.textContent = resultsLines.join("\n");
+
+  const refiLines = [];
+  refiLines.push(`New annual interest rate: ${els.refiNewApr.value || "—"}`);
+  refiLines.push(`One-time refinance costs: ${els.refiClosingCosts.value ? fmtUSD2(safeNum(els.refiClosingCosts.value, 0)) : "—"}`);
+  refiLines.push(`Keep years: ${els.refiKeepYears.value || "—"}`);
+  refiLines.push(`Estimated break-even: ${els.refiBreakeven.textContent}`);
+  refiLines.push(`Estimated savings: ${els.refiSavings.textContent}`);
+  if (els.reportRefi) els.reportRefi.textContent = refiLines.join("\n");
 }
 
-async function fetchLatestTreasuryYield() {
-  els.tsyStatus.textContent = "Fetching…";
-  try{
-    const html = await fetchTextBestEffort(TSY_YIELD_URL);
-    const parsed = parseLatestTreasuryYieldFromHtml(html);
-    lastTsy = parsed;
+// ---------- Share link (kept minimal, works fine without new stress params) ----------
+function buildShareURL() {
+  const url = new URL(window.location.href);
+  url.search = "";
 
-    const label = els.tsyMaturity.value;
-    const val = parsed.values[label];
+  const loanType = els.loanType.value;
+  setParam(url, "loan", loanType);
+  setParam(url, "p", els.principal.value);
+  setParam(url, "apr", els.apr.value);
+  setParam(url, "delta", els.delta.value);
+  if (els.delta.value === "custom") setParam(url, "cdelta", els.customDelta.value);
 
-    els.tsyValue.textContent = isFinite(val) ? `${val.toFixed(2)}%` : "—";
-    els.tsyMeta.textContent = `Date: ${parsed.date}`;
-    els.tsyStatus.textContent = "Done.";
-    setTimeout(() => els.tsyStatus.textContent = "", 1500);
+  if (loanType !== "creditcard") {
+    setParam(url, "term", els.termYears.value);
+    setParam(url, "extra", els.extraPayment.value || "0");
+    setParam(url, "refiapr", els.refiNewApr.value);
+    setParam(url, "reficost", els.refiClosingCosts.value);
+    setParam(url, "keep", els.refiKeepYears.value);
 
-    // Also sync ARM index if user chose Treasury source
-    syncArmIndexFromTreasury();
-  }catch(e){
-    els.tsyStatus.textContent = "Could not fetch Treasury yields (blocked). Try again later.";
+    if (loanType === "mortgage") {
+      setParam(url, "tax", els.annualTax.value);
+      setParam(url, "ins", els.annualIns.value);
+      setParam(url, "fees", els.monthlyHOA.value);
+    }
+  } else {
+    setParam(url, "ccmode", els.ccMode.value);
+    setParam(url, "ccpay", els.ccFixedPayment.value);
+  }
+
+  return url.toString();
+}
+
+function applyParamsFromURL() {
+  const p = new URLSearchParams(window.location.search);
+  if (!p.size) return;
+
+  const loan = p.get("loan");
+  if (loan) els.loanType.value = loan;
+
+  if (p.get("p")) els.principal.value = p.get("p");
+  if (p.get("apr")) els.apr.value = p.get("apr");
+  if (p.get("delta")) els.delta.value = p.get("delta");
+
+  els.customDeltaWrap.style.display = (els.delta.value === "custom") ? "" : "none";
+  if (p.get("cdelta")) els.customDelta.value = p.get("cdelta");
+
+  if (els.loanType.value !== "creditcard") {
+    if (p.get("term")) els.termYears.value = p.get("term");
+    if (p.get("extra")) els.extraPayment.value = p.get("extra");
+
+    if (p.get("refiapr")) els.refiNewApr.value = p.get("refiapr");
+    if (p.get("reficost")) els.refiClosingCosts.value = p.get("reficost");
+    if (p.get("keep")) els.refiKeepYears.value = p.get("keep");
+
+    if (els.loanType.value === "mortgage") {
+      if (p.get("tax")) els.annualTax.value = p.get("tax");
+      if (p.get("ins")) els.annualIns.value = p.get("ins");
+      if (p.get("fees")) els.monthlyHOA.value = p.get("fees");
+    }
+  } else {
+    if (p.get("ccmode")) els.ccMode.value = p.get("ccmode");
+    if (p.get("ccpay")) els.ccFixedPayment.value = p.get("ccpay");
+  }
+
+  showHideFields();
+  setStatus("Loaded from share link. Click Calculate.");
+}
+
+// ---------- CSV ----------
+function scheduleToCSV(scheduleObj) {
+  const lines = [];
+  lines.push(["Month","APR","Payment","Interest","Principal","Balance"].join(","));
+
+  let sumInt = 0, sumPrin = 0;
+  for (const row of scheduleObj.schedule) {
+    sumInt += row.interest;
+    sumPrin += row.principal;
+    lines.push([
+      row.month,
+      (row.apr ?? "").toString(),
+      row.payment.toFixed(2),
+      row.interest.toFixed(2),
+      row.principal.toFixed(2),
+      row.balance.toFixed(2)
+    ].join(","));
+  }
+
+  lines.push("");
+  lines.push(["Totals","","", sumInt.toFixed(2), sumPrin.toFixed(2), ""].join(","));
+  return lines.join("\n");
+}
+
+// ---------- Stress UI ----------
+const st = {
+  mode: $("stMode"),
+
+  baseApr: $("stBaseApr"),
+  principal: $("stPrincipal"),
+  termYears: $("stTermYears"),
+  extra: $("stExtra"),
+
+  // steps
+  preset: $("stPreset"),
+  step: $("stStep"),
+  every: $("stEveryMonths"),
+  duration: $("stDurationMonths"),
+  cap: $("stCapApr"),
+
+  // ARM
+  armStartDate: $("armStartDate"),
+  armFixedYears: $("armFixedYears"),
+  armAdjustEveryMonths: $("armAdjustEveryMonths"),
+  armIndexMode: $("armIndexMode"),
+  armIndexSource: $("armIndexSource"),
+  armIndexValue: $("armIndexValue"),
+  armIndexMaturity: $("armIndexMaturity"),
+  armIndexSchedule: $("armIndexSchedule"),
+  armMargin: $("armMargin"),
+  armPeriodicCap: $("armPeriodicCap"),
+  armLifetimeCap: $("armLifetimeCap"),
+  armFloor: $("armFloor"),
+  armSimYears: $("armSimYears"),
+
+  // buttons + outputs
+  useCalcBtn: $("stUseCalcBtn"),
+  runBtn: $("stRunBtn"),
+  status: $("stStatus"),
+
+  worstPayment: $("stWorstPayment"),
+  worstWhen: $("stWorstWhen"),
+  totalInterest: $("stTotalInterest"),
+  payoff: $("stPayoff"),
+  risk: $("stRisk"),
+  peakRate: $("stPeakRate"),
+  peakMeta: $("stPeakMeta"),
+
+  tbody: $("stTable")?.querySelector("tbody"),
+  chartCanvas: $("stChart"),
+};
+
+let stChart = null;
+
+function showHideStressMode() {
+  const mode = st.mode.value;
+  const stepsOnly = document.querySelectorAll(".stStepsOnly");
+  const armOnly = document.querySelectorAll(".stArmOnly");
+
+  stepsOnly.forEach(el => el.style.display = (mode === "steps") ? "" : "none");
+  armOnly.forEach(el => el.style.display = (mode === "arm") ? "" : "none");
+
+  showHideArmIndexControls();
+}
+
+function showHideArmIndexControls(){
+  if (!st.armIndexMode) return;
+  const m = st.armIndexMode.value;
+
+  // Constant/hist use indexSource+indexValue; Schedule uses textarea; history uses start date + maturity.
+  const constantShow = (m === "constant");
+  const histShow = (m === "treasury_history");
+  const schedShow = (m === "manual_schedule");
+
+  // Always show these in ARM:
+  st.armMargin.parentElement.style.display = "";
+  st.armPeriodicCap.parentElement.style.display = "";
+  st.armLifetimeCap.parentElement.style.display = "";
+  st.armFloor.parentElement.style.display = "";
+  st.armSimYears.parentElement.style.display = "";
+  st.armFixedYears.parentElement.style.display = "";
+  st.armAdjustEveryMonths.parentElement.style.display = "";
+
+  // Conditional:
+  st.armIndexSource.parentElement.style.display = (constantShow) ? "" : "none";
+  st.armIndexValue.parentElement.style.display = (constantShow) ? "" : "none";
+
+  st.armStartDate.parentElement.style.display = (histShow) ? "" : "none";
+  st.armIndexMaturity.parentElement.style.display = (histShow) ? "" : "none";
+
+  st.armIndexSchedule.parentElement.style.display = (schedShow) ? "" : "none";
+}
+
+function applyStressPreset() {
+  const p = st.preset.value;
+  if (p === "gentle") { st.step.value = 0.25; st.every.value = 6; st.duration.value = 24; }
+  if (p === "moderate") { st.step.value = 0.25; st.every.value = 3; st.duration.value = 24; }
+  if (p === "shock") { st.step.value = 0.50; st.every.value = 3; st.duration.value = 18; }
+}
+
+function stressUseCalcInputs() {
+  st.principal.value = els.principal.value || "";
+  st.termYears.value = els.termYears.value || "";
+  st.baseApr.value = els.apr.value || "";
+  st.extra.value = els.extraPayment.value || "0";
+  st.status.textContent = "Copied inputs from calculator.";
+  setTimeout(() => st.status.textContent = "", 1500);
+}
+
+function renderStressTable(schedule) {
+  if (!st.tbody) return;
+  st.tbody.innerHTML = "";
+  const max = Math.min(36, schedule.length);
+  for (let i=0; i<max; i++){
+    const r = schedule[i];
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.month}</td>
+      <td>${r.apr.toFixed(2)}%</td>
+      <td>${fmtUSD2(r.payment)}</td>
+      <td>${fmtUSD2(r.interest)}</td>
+      <td>${fmtUSD2(r.principal)}</td>
+      <td>${fmtUSD2(r.balance)}</td>
+    `;
+    st.tbody.appendChild(tr);
+  }
+  if (schedule.length > max){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="6" class="muted">Showing first ${max} rows (out of ${schedule.length}).</td>`;
+    st.tbody.appendChild(tr);
   }
 }
 
-function applyTsyToApr() {
-  if (!lastTsy) { els.tsyStatus.textContent = "Fetch Treasury yields first."; return; }
-  const label = els.tsyMaturity.value;
-  const val = lastTsy.values[label];
-  if (!isFinite(val)) { els.tsyStatus.textContent = "No yield available."; return; }
-  els.apr.value = val.toFixed(2);
-  els.tsyStatus.textContent = "Applied to calculator APR.";
-  setTimeout(() => els.tsyStatus.textContent = "", 1500);
+function buildStressChart(schedule) {
+  if (!schedule?.length) return;
+  const ds = downsampleSchedule(schedule, 160);
+
+  const labels = ds.map(x => x.month);
+  const pay = ds.map(x => x.payment);
+  const apr = ds.map(x => x.apr);
+
+  if (stChart) stChart.destroy();
+  stChart = new Chart(st.chartCanvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "Monthly payment", data: pay, borderWidth: 2, pointRadius: 0, tension: 0.25 },
+        { label: "APR (%)", data: apr, borderWidth: 2, pointRadius: 0, tension: 0.25, yAxisID: "y2" },
+      ]
+    },
+    options: {
+      responsive:true,
+      maintainAspectRatio:false,
+      interaction:{ mode:"index", intersect:false },
+      plugins:{ legend:{ display:true }, tooltip:{ mode:"index", intersect:false } },
+      scales:{
+        y:{ title:{ display:true, text:"Payment ($)" }, ticks:{ callback:(v)=>"$"+shortCurrency(v) } },
+        y2:{ position:"right", grid:{ drawOnChartArea:false }, title:{ display:true, text:"APR (%)" } }
+      }
+    }
+  });
 }
 
-// ---------- PDF Export ----------
-async function downloadPDFReport() {
-  if (!window.jspdf?.jsPDF) {
-    setStatus("PDF library not loaded yet. Try again in 2 seconds.");
+function summarizeStress(sim, extraMeta = "") {
+  if (!sim.schedule.length) return;
+
+  const startPayment = sim.schedule[0].payment;
+  let worst = sim.schedule[0];
+  let peakRate = sim.schedule[0].apr;
+
+  for (const r of sim.schedule){
+    if (r.payment > worst.payment) worst = r;
+    if (r.apr > peakRate) peakRate = r.apr;
+  }
+
+  st.worstPayment.textContent = fmtUSD2(worst.payment);
+  st.worstWhen.textContent = `Month ${worst.month} at ${worst.apr.toFixed(2)}% APR`;
+  st.totalInterest.textContent = fmtUSD2(sim.totalInterest);
+  st.payoff.textContent = sim.endedEarly
+    ? `Simulated ${sim.payoffMonths} months (loan not fully paid off)`
+    : `Payoff: ${sim.payoffMonths} months`;
+
+  const risk = riskScoreFromJump(startPayment, worst.payment);
+  st.risk.textContent = risk.score;
+  st.peakRate.textContent = `${peakRate.toFixed(2)}%`;
+  st.peakMeta.textContent = extraMeta ? `${risk.label} • ${extraMeta}` : risk.label;
+
+  renderStressTable(sim.schedule);
+  buildStressChart(sim.schedule);
+}
+
+// Constant mode helper: auto-fill index from latest Treasury fetch
+function syncArmIndexFromTreasuryConstant() {
+  if (!st.armIndexSource) return;
+  if (st.armIndexSource.value !== "treasury") return;
+  if (!lastTsy) return;
+  // reuse the maturity chosen in Live Rates dropdown
+  const label = els.tsyMaturity.value || "1 Yr";
+  const v = lastTsy.values[label];
+  if (isFinite(v)) st.armIndexValue.value = v.toFixed(2);
+}
+
+// Parse manual schedule
+function parseIndexSchedule(text){
+  const parts = (text || "")
+    .split(/[,;\n]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  const nums = parts.map(x => parseFloat(x)).filter(v => isFinite(v));
+  return nums;
+}
+
+async function runStressTest() {
+  st.status.textContent = "";
+
+  const P0 = safeNum(st.principal.value, NaN);
+  const termY = safeNum(st.termYears.value, NaN);
+  const startApr = safeNum(st.baseApr.value, NaN);
+  const extra = safeNum(st.extra.value, 0);
+
+  if (!(P0 > 0 && termY > 0 && startApr >= 0)) {
+    st.status.textContent = "Fill in starting balance, term years, and starting interest rate.";
     return;
   }
-  if (!lastSummary) setStatus("Tip: run a calculation first for a complete report.");
 
-  updateReportBlocks();
+  const mode = st.mode.value;
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit:"pt", format:"letter" });
+  // --- Simple Steps ---
+  if (mode === "steps") {
+    applyStressPreset();
 
-  const margin = 36;
-  let y = 44;
+    const step = safeNum(st.step.value, 0);
+    const everyMonths = Math.max(1, Math.round(safeNum(st.every.value, 3)));
+    const durationMonths = Math.max(1, Math.round(safeNum(st.duration.value, 24)));
+    const capApr = safeNum(st.cap.value, NaN);
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.text("RateSense Report", margin, y);
-  y += 18;
+    const map = new Map();
+    const pathArr = buildRatePathSteps(startApr, step, everyMonths, durationMonths, capApr);
+    for (const x of pathArr) map.set(x.month, x.apr);
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.text((els.reportDate?.textContent || ""), margin, y);
-  y += 16;
+    const sim = simulateStressAmortized(P0, termY, startApr, extra, map, null);
+    summarizeStress(sim, `Steps: +${step.toFixed(2)}% every ${everyMonths} months`);
+    st.status.textContent = "Stress test complete.";
+    setTimeout(() => st.status.textContent = "", 1500);
+    return;
+  }
 
-  doc.setFont("helvetica", "bold");
-  doc.text("Inputs", margin, y); y += 12;
-  doc.setFont("helvetica", "normal");
-  doc.text((els.reportInputs?.textContent || "").split("\n"), margin, y);
-  y += 12 + ((els.reportInputs?.textContent || "").split("\n").length * 12);
+  // --- ARM Mode ---
+  const fixedYears = safeNum(st.armFixedYears.value, 5);
+  const adjustEveryMonths = Math.max(1, Math.round(safeNum(st.armAdjustEveryMonths.value, 12)));
+  const margin = safeNum(st.armMargin.value, 0);
+  const periodicCap = safeNum(st.armPeriodicCap.value, NaN);
+  const lifetimeCap = safeNum(st.armLifetimeCap.value, NaN);
+  const floorRate = safeNum(st.armFloor.value, NaN);
 
-  doc.setFont("helvetica", "bold");
-  doc.text("Results", margin, y); y += 12;
-  doc.setFont("helvetica", "normal");
-  doc.text((els.reportResults?.textContent || "").split("\n"), margin, y);
-  y += 12 + ((els.reportResults?.textContent || "").split("\n").length * 12);
+  const simYears = safeNum(st.armSimYears.value, NaN);
+  const simMonthsMax = isFinite(simYears) && simYears > 0 ? Math.round(simYears * 12) : null;
 
-  doc.setFont("helvetica", "bold");
-  doc.text("Refinance (optional)", margin, y); y += 12;
-  doc.setFont("helvetica", "normal");
-  doc.text((els.reportRefi?.textContent || "").split("\n"), margin, y);
+  const indexMode = st.armIndexMode.value;
 
-  try{
-    if (chart && els.chartCanvas) {
-      const img = els.chartCanvas.toDataURL("image/png", 1.0);
-      doc.addPage();
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.text("Chart", margin, 50);
-      doc.addImage(img, "PNG", margin, 70, 540, 300);
+  // Build getIndexForReset()
+  let getIndexForReset = null;
+  let meta = "";
+
+  if (indexMode === "constant") {
+    if (st.armIndexSource.value === "treasury") {
+      if (!lastTsy) {
+        st.status.textContent = "Fetch Treasury yields in Live Rates first (or switch constant index to Manual).";
+        return;
+      }
+      syncArmIndexFromTreasuryConstant();
     }
-  }catch(_){ /* ignore */ }
+    const indexRate = safeNum(st.armIndexValue.value, NaN);
+    if (!(indexRate >= 0)) {
+      st.status.textContent = "Enter an index rate (0 or higher) for constant mode.";
+      return;
+    }
+    getIndexForReset = () => indexRate;
+    meta = `ARM: fixed ${fixedYears}y then adjust every ${adjustEveryMonths}m • index constant ${indexRate.toFixed(2)}% + margin ${margin.toFixed(2)}%`;
+  }
 
-  doc.save("ratesense_report.pdf");
-  setStatus("PDF downloaded.");
-  setTimeout(() => setStatus(""), 1500);
+  if (indexMode === "manual_schedule") {
+    const arr = parseIndexSchedule(st.armIndexSchedule.value);
+    if (!arr.length) {
+      st.status.textContent = "Paste a manual index schedule (example: 4.80, 5.10, 4.95).";
+      return;
+    }
+    getIndexForReset = (k) => {
+      // if schedule shorter than resets, repeat last value
+      if (k <= arr.length) return arr[k-1];
+      return arr[arr.length-1];
+    };
+    meta = `ARM: fixed ${fixedYears}y then adjust every ${adjustEveryMonths}m • manual index schedule (${arr.length} values) + margin ${margin.toFixed(2)}%`;
+  }
+
+  if (indexMode === "treasury_history") {
+    const maturity = st.armIndexMaturity.value || "1 Yr";
+    const startDateStr = st.armStartDate.value;
+
+    if (!startDateStr) {
+      st.status.textContent = "Pick a start date for Treasury history mode.";
+      return;
+    }
+
+    const startDateUTC = new Date(startDateStr + "T00:00:00Z");
+    if (!isFinite(startDateUTC.getTime())) {
+      st.status.textContent = "Start date is invalid.";
+      return;
+    }
+
+    // Reset date definition:
+    // first reset happens the month AFTER fixed period ends, at month (fixedMonths+1)
+    const fixedMonths = Math.round(fixedYears * 12);
+    const adjEvery = Math.max(1, Math.round(adjustEveryMonths));
+
+    // Cache computed index values per reset count
+    const cache = new Map();
+
+    getIndexForReset = (k) => {
+      // synchronous wrapper will be replaced by async precompute
+      return cache.get(k);
+    };
+
+    // Precompute index for each reset we might need, using Treasury history
+    const totalMonths = Math.round(termY * 12);
+    const stopM = simMonthsMax ? Math.min(totalMonths, simMonthsMax) : totalMonths;
+
+    const resetMonths = [];
+    for (let m=fixedMonths+1; m<=stopM; m++){
+      const isResetMonth = ((m - (fixedMonths+1)) % adjEvery === 0);
+      if (isResetMonth) resetMonths.push(m);
+    }
+
+    st.status.textContent = "Fetching Treasury history for reset dates…";
+
+    // For each reset month, compute its calendar date and fetch yield on/before.
+    for (let i=0; i<resetMonths.length; i++){
+      const resetMonth = resetMonths[i];
+      const monthsFromStart = resetMonth - 1; // month 1 corresponds to start date
+      const dateUTC = addMonthsUTC(startDateUTC, monthsFromStart);
+
+      const { value, usedDate } = await getTreasuryYieldOnOrBefore(dateUTC, maturity);
+      if (!isFinite(value)) {
+        st.status.textContent = `Could not find Treasury ${maturity} yield for reset near ${ymdUTC(dateUTC)}.`;
+        return;
+      }
+      cache.set(i+1, value);
+      // keep only short status updates (avoid spam)
+      if (i === 0 || i === resetMonths.length-1) {
+        st.status.textContent = `Treasury history: resolved ${i+1}/${resetMonths.length} reset yields…`;
+      }
+    }
+
+    meta = `ARM: fixed ${fixedYears}y then adjust every ${adjustEveryMonths}m • Treasury history ${maturity} + margin ${margin.toFixed(2)}% (start ${startDateStr})`;
+  }
+
+  if (!getIndexForReset) {
+    st.status.textContent = "Internal error: could not build index function.";
+    return;
+  }
+
+  const rateMap = buildRatePathARM({
+    startApr,
+    fixedYears,
+    adjustEveryMonths,
+    margin,
+    periodicCap,
+    lifetimeCap,
+    floorRate,
+    simMonthsMax: simMonthsMax ?? 600,
+    getIndexForReset
+  });
+
+  const sim = simulateStressAmortized(P0, termY, startApr, extra, rateMap, simMonthsMax);
+  summarizeStress(sim, meta);
+
+  st.status.textContent = "ARM stress test complete.";
+  setTimeout(() => st.status.textContent = "", 1500);
 }
 
 // ---------- Compare Mode ----------
@@ -1112,6 +1605,7 @@ const cmp = {
   status: $("compareStatus"),
   tbody: $("compareTable")?.querySelector("tbody"),
 };
+
 let lastCompareSummary = "";
 
 function addonsMonthlyFor(annualTax, annualIns, feesMonthly) {
@@ -1242,254 +1736,6 @@ function initCompareDefaults() {
   if (cmp.bHoa) cmp.bHoa.value = 0;
 }
 
-// ---------- Stress UI ----------
-const st = {
-  mode: $("stMode"),
-
-  baseApr: $("stBaseApr"),
-  principal: $("stPrincipal"),
-  termYears: $("stTermYears"),
-  extra: $("stExtra"),
-
-  // steps
-  preset: $("stPreset"),
-  step: $("stStep"),
-  every: $("stEveryMonths"),
-  duration: $("stDurationMonths"),
-  cap: $("stCapApr"),
-
-  // ARM
-  armFixedYears: $("armFixedYears"),
-  armAdjustEveryMonths: $("armAdjustEveryMonths"),
-  armIndexSource: $("armIndexSource"),
-  armIndexValue: $("armIndexValue"),
-  armIndexMaturity: $("armIndexMaturity"),
-  armMargin: $("armMargin"),
-  armPeriodicCap: $("armPeriodicCap"),
-  armLifetimeCap: $("armLifetimeCap"),
-  armFloor: $("armFloor"),
-  armSimYears: $("armSimYears"),
-
-  // buttons + outputs
-  useCalcBtn: $("stUseCalcBtn"),
-  runBtn: $("stRunBtn"),
-  status: $("stStatus"),
-
-  worstPayment: $("stWorstPayment"),
-  worstWhen: $("stWorstWhen"),
-  totalInterest: $("stTotalInterest"),
-  payoff: $("stPayoff"),
-  risk: $("stRisk"),
-  peakRate: $("stPeakRate"),
-  peakMeta: $("stPeakMeta"),
-
-  tbody: $("stTable")?.querySelector("tbody"),
-  chartCanvas: $("stChart"),
-};
-
-let stChart = null;
-
-function showHideStressMode() {
-  const mode = st.mode.value;
-  const stepsOnly = document.querySelectorAll(".stStepsOnly");
-  const armOnly = document.querySelectorAll(".stArmOnly");
-
-  stepsOnly.forEach(el => el.style.display = (mode === "steps") ? "" : "none");
-  armOnly.forEach(el => el.style.display = (mode === "arm") ? "" : "none");
-}
-
-function applyStressPreset() {
-  const p = st.preset.value;
-  if (p === "gentle") { st.step.value = 0.25; st.every.value = 6; st.duration.value = 24; }
-  if (p === "moderate") { st.step.value = 0.25; st.every.value = 3; st.duration.value = 24; }
-  if (p === "shock") { st.step.value = 0.50; st.every.value = 3; st.duration.value = 18; }
-}
-
-function stressUseCalcInputs() {
-  st.principal.value = els.principal.value || "";
-  st.termYears.value = els.termYears.value || "";
-  st.baseApr.value = els.apr.value || "";
-  st.extra.value = els.extraPayment.value || "0";
-  st.status.textContent = "Copied inputs from calculator.";
-  setTimeout(() => st.status.textContent = "", 1500);
-}
-
-// If user selects Treasury as ARM index source, use lastTsy + chosen maturity.
-function syncArmIndexFromTreasury() {
-  if (!st.armIndexSource) return;
-  if (st.armIndexSource.value !== "treasury") return;
-  if (!lastTsy) return;
-  const label = st.armIndexMaturity.value || "1 Yr";
-  const v = lastTsy.values[label];
-  if (isFinite(v)) st.armIndexValue.value = v.toFixed(2);
-}
-
-function renderStressTable(schedule) {
-  if (!st.tbody) return;
-  st.tbody.innerHTML = "";
-  const max = Math.min(36, schedule.length);
-  for (let i=0; i<max; i++){
-    const r = schedule[i];
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${r.month}</td>
-      <td>${r.apr.toFixed(2)}%</td>
-      <td>${fmtUSD2(r.payment)}</td>
-      <td>${fmtUSD2(r.interest)}</td>
-      <td>${fmtUSD2(r.principal)}</td>
-      <td>${fmtUSD2(r.balance)}</td>
-    `;
-    st.tbody.appendChild(tr);
-  }
-  if (schedule.length > max){
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="6" class="muted">Showing first ${max} rows (out of ${schedule.length}).</td>`;
-    st.tbody.appendChild(tr);
-  }
-}
-
-function buildStressChart(schedule) {
-  if (!schedule?.length) return;
-  const ds = downsampleSchedule(schedule, 160);
-
-  const labels = ds.map(x => x.month);
-  const pay = ds.map(x => x.payment);
-  const apr = ds.map(x => x.apr);
-
-  if (stChart) stChart.destroy();
-  stChart = new Chart(st.chartCanvas, {
-    type: "line",
-    data: {
-      labels,
-      datasets: [
-        { label: "Monthly payment", data: pay, borderWidth: 2, pointRadius: 0, tension: 0.25 },
-        { label: "APR (%)", data: apr, borderWidth: 2, pointRadius: 0, tension: 0.25, yAxisID: "y2" },
-      ]
-    },
-    options: {
-      responsive:true,
-      maintainAspectRatio:false,
-      interaction:{ mode:"index", intersect:false },
-      plugins:{ legend:{ display:true }, tooltip:{ mode:"index", intersect:false } },
-      scales:{
-        y:{ title:{ display:true, text:"Payment ($)" }, ticks:{ callback:(v)=>"$"+shortCurrency(v) } },
-        y2:{ position:"right", grid:{ drawOnChartArea:false }, title:{ display:true, text:"APR (%)" } }
-      }
-    }
-  });
-}
-
-function summarizeStress(sim, extraMeta = "") {
-  if (!sim.schedule.length) return;
-
-  const startPayment = sim.schedule[0].payment;
-  let worst = sim.schedule[0];
-  let peakRate = sim.schedule[0].apr;
-
-  for (const r of sim.schedule){
-    if (r.payment > worst.payment) worst = r;
-    if (r.apr > peakRate) peakRate = r.apr;
-  }
-
-  st.worstPayment.textContent = fmtUSD2(worst.payment);
-  st.worstWhen.textContent = `Month ${worst.month} at ${worst.apr.toFixed(2)}% APR`;
-  st.totalInterest.textContent = fmtUSD2(sim.totalInterest);
-  st.payoff.textContent = sim.endedEarly
-    ? `Simulated ${sim.payoffMonths} months (loan not fully paid off)`
-    : `Payoff: ${sim.payoffMonths} months`;
-
-  const risk = riskScoreFromJump(startPayment, worst.payment);
-  st.risk.textContent = risk.score;
-  st.peakRate.textContent = `${peakRate.toFixed(2)}%`;
-  st.peakMeta.textContent = extraMeta ? `${risk.label} • ${extraMeta}` : risk.label;
-
-  renderStressTable(sim.schedule);
-  buildStressChart(sim.schedule);
-}
-
-function runStressTest() {
-  st.status.textContent = "";
-
-  const P0 = safeNum(st.principal.value, NaN);
-  const termY = safeNum(st.termYears.value, NaN);
-  const startApr = safeNum(st.baseApr.value, NaN);
-  const extra = safeNum(st.extra.value, 0);
-
-  if (!(P0 > 0 && termY > 0 && startApr >= 0)) {
-    st.status.textContent = "Fill in starting balance, term years, and starting interest rate.";
-    return;
-  }
-
-  const mode = st.mode.value;
-
-  // --- Simple Steps ---
-  if (mode === "steps") {
-    applyStressPreset();
-
-    const step = safeNum(st.step.value, 0);
-    const everyMonths = Math.max(1, Math.round(safeNum(st.every.value, 3)));
-    const durationMonths = Math.max(1, Math.round(safeNum(st.duration.value, 24)));
-    const capApr = safeNum(st.cap.value, NaN);
-
-    const map = new Map();
-    const pathArr = buildRatePathSteps(startApr, step, everyMonths, durationMonths, capApr);
-    for (const x of pathArr) map.set(x.month, x.apr);
-
-    // simulate full term
-    const sim = simulateStressAmortized(P0, termY, startApr, extra, map, null);
-    summarizeStress(sim, `Steps: +${step.toFixed(2)}% every ${everyMonths} months`);
-    st.status.textContent = "Stress test complete.";
-    setTimeout(() => st.status.textContent = "", 1500);
-    return;
-  }
-
-  // --- ARM Mode (Fixed then Index+Margin with caps) ---
-  const fixedYears = safeNum(st.armFixedYears.value, 5);
-  const adjustEveryMonths = Math.max(1, Math.round(safeNum(st.armAdjustEveryMonths.value, 12)));
-
-  // index source
-  if (st.armIndexSource.value === "treasury") {
-    if (!lastTsy) {
-      st.status.textContent = "Fetch Treasury yields in Live Rates first (or switch index source to Manual).";
-      return;
-    }
-    syncArmIndexFromTreasury();
-  }
-
-  const indexRate = safeNum(st.armIndexValue.value, NaN);
-  if (!(indexRate >= 0)) {
-    st.status.textContent = "Enter an index rate (0 or higher).";
-    return;
-  }
-
-  const margin = safeNum(st.armMargin.value, 0);
-  const periodicCap = safeNum(st.armPeriodicCap.value, NaN);
-  const lifetimeCap = safeNum(st.armLifetimeCap.value, NaN);
-  const floorRate = safeNum(st.armFloor.value, NaN);
-
-  const simYears = safeNum(st.armSimYears.value, NaN);
-  const simMonthsMax = isFinite(simYears) && simYears > 0 ? Math.round(simYears * 12) : null;
-
-  const rateMap = buildRatePathARM({
-    startApr,
-    fixedYears,
-    adjustEveryMonths,
-    indexRate,
-    margin,
-    periodicCap,
-    lifetimeCap,
-    floorRate,
-    simMonthsMax: simMonthsMax ?? 600
-  });
-
-  const meta = `ARM: fixed ${fixedYears}y then adjust every ${adjustEveryMonths}m • index ${indexRate.toFixed(2)}% + margin ${margin.toFixed(2)}%`;
-  const sim = simulateStressAmortized(P0, termY, startApr, extra, rateMap, simMonthsMax);
-  summarizeStress(sim, meta);
-
-  st.status.textContent = "ARM stress test complete.";
-  setTimeout(() => st.status.textContent = "", 1500);
-}
-
 // ---------- Events ----------
 els.loanType.addEventListener("change", showHideFields);
 els.delta.addEventListener("change", () => {
@@ -1548,7 +1794,7 @@ els.tsyMaturity.addEventListener("change", () => {
   if (!lastTsy) return;
   const val = lastTsy.values[els.tsyMaturity.value];
   els.tsyValue.textContent = isFinite(val) ? `${val.toFixed(2)}%` : "—";
-  syncArmIndexFromTreasury();
+  syncArmIndexFromTreasuryConstant();
 });
 
 // Compare
@@ -1561,19 +1807,27 @@ if (cmp.btn) {
   initCompareDefaults();
 }
 
-// Stress controls
+// Stress
 st.mode.addEventListener("change", showHideStressMode);
 st.preset.addEventListener("change", applyStressPreset);
 st.useCalcBtn.addEventListener("click", stressUseCalcInputs);
 st.runBtn.addEventListener("click", runStressTest);
 
-st.armIndexSource.addEventListener("change", () => {
-  if (st.armIndexSource.value === "treasury") syncArmIndexFromTreasury();
-});
-st.armIndexMaturity.addEventListener("change", syncArmIndexFromTreasury);
+st.armIndexMode.addEventListener("change", showHideArmIndexControls);
+st.armIndexSource.addEventListener("change", syncArmIndexFromTreasuryConstant);
 
 // init
 applyParamsFromURL();
 showHideFields();
 updateReportBlocks();
 showHideStressMode();
+showHideArmIndexControls();
+
+// Default start date to today (UTC) if empty
+if (st.armStartDate && !st.armStartDate.value) {
+  const d = new Date();
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth()+1).padStart(2,"0");
+  const dd = String(d.getUTCDate()).padStart(2,"0");
+  st.armStartDate.value = `${yyyy}-${mm}-${dd}`;
+}
