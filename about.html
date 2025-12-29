@@ -21,30 +21,31 @@
 
 <body>
   <!-- IMPORTANT: If your other pages use a different header markup, copy it from index.html -->
-  <header class="header">
-    <div class="wrap headerInner">
-      <a class="brand" href="./index.html" aria-label="RateSense home">
-        <div class="brandMark">RS</div>
-        <div class="brandText">
-          <div class="brandName">RateSense</div>
-          <div class="brandTag">Turn rate changes into real monthly impacts.</div>
-        </div>
-      </a>
+<header class="header headerDark">
+  <div class="wrap headerLayout">
 
-      <button id="menuBtn" class="menuBtn" aria-label="Menu" aria-expanded="false">
-        <span></span><span></span><span></span>
-      </button>
+    <!-- LEFT: Navigation -->
+    <nav class="nav navLeft" aria-label="Primary">
+      <a href="./index.html#calculator">Calculator</a>
+      <a href="./scenarios.html">Scenarios</a>
+      <a href="./compare.html">Compare</a>
+      <a href="./stress.html">Stress Test</a>
+      <a href="./rates.html">Rates</a>
+      <a href="./about.html">About</a>
+    </nav>
 
-      <nav id="nav" class="nav" aria-label="Primary">
-        <a href="./index.html#calculator">Calculator</a>
-        <a href="./scenarios.html">Scenarios</a>
-        <a href="./compare.html">Compare</a>
-        <a href="./stress.html">Stress Test</a>
-        <a href="./rates.html">Rates</a>
-        <a class="active" href="./about.html">About</a>
-      </nav>
-    </div>
-  </header>
+    <!-- RIGHT: Brand -->
+    <a class="brand brandRight" href="./index.html" aria-label="RateSense home">
+      <div class="brandMark">RS</div>
+      <div class="brandText">
+        <div class="brandName">RateSense</div>
+        <div class="brandTag">Turn rate changes into real monthly impacts.</div>
+      </div>
+    </a>
+
+  </div>
+</header>
+
 
   <main class="wrap">
     <section class="hero">
