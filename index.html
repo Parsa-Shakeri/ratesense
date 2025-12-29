@@ -3,164 +3,129 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>RateSense</title>
-
-  <meta name="theme-color" content="#0b0d12">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="dark" />
+  <title>RateSense — Rate Impact + Stress Test</title>
 
   <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
+
+  <script src="app.js" defer></script>
 </head>
+
 <body>
-
-  <!-- Portfolio-ready disclaimer banner -->
-  <div class="banner">
-    <div class="wrap bannerInner">
-      <span><b>Educational tool</b> — not financial advice. Results are estimates using standard amortization formulas.</span>
-      <a class="bannerLink" href="#methodology">Methodology</a>
-    </div>
-  </div>
-
-  <header class="wrap header no-print">
+  <header class="header">
     <div class="brand">
       <div class="logo">RS</div>
       <div>
         <div class="title">RateSense</div>
-        <div class="subtitle">Turn interest-rate headlines into real monthly budget impacts.</div>
+        <div class="subtitle">See how interest rates change payments, payoff time, and total cost.</div>
       </div>
     </div>
 
-    <button id="menuBtn" class="menuBtn no-print" aria-label="Open menu" aria-expanded="false">☰</button>
+    <button id="menuBtn" class="menuBtn" aria-expanded="false" aria-controls="nav" title="Menu">
+      <span></span><span></span><span></span>
+    </button>
 
     <nav id="nav" class="nav">
       <a href="#calculator">Calculator</a>
+      <a href="#liveRates">Live Rates</a>
+      <a href="#stress">Stress Test</a>
       <a href="#compare">Compare</a>
-      <a href="#scenarios">Scenarios</a>
-      <a href="#saved">Saved</a>
-      <a href="#learn">Learn</a>
-      <a href="#about">About</a>
+      <a href="#about">Case Study</a>
     </nav>
   </header>
 
   <main class="wrap">
     <!-- CALCULATOR -->
     <section id="calculator" class="card">
-      <div class="topRow">
-        <div class="topLeft">
-          <h1>Calculator</h1>
-          <p class="muted">
-            Payments, total interest, payoff time, refinance estimate, charts, exports,
-            and (for mortgages) total monthly housing cost.
-          </p>
-        </div>
-
-        <div class="topActions no-print">
-          <button id="copyBtn" class="btn">Copy summary</button>
-          <button id="shareBtn" class="btn">Copy share link</button>
-          <button id="csvBtn" class="btn">Download CSV</button>
-          <button id="printBtn" class="btn">Print report</button>
-          <span id="status" class="status"></span>
-        </div>
-      </div>
+      <h2>Calculator</h2>
 
       <div class="layout">
-        <!-- LEFT: Inputs -->
-        <aside class="panel no-print">
-          <div class="panelHeader">
-            <h2>Inputs</h2>
-            <label class="switch">
-              <input type="checkbox" id="explainToggle" checked>
-              <span>Explain results</span>
-            </label>
-          </div>
+        <div class="panel topLeft">
+          <h3>Inputs</h3>
 
-          <div class="field">
-            <label for="loanType">Loan type</label>
-            <select id="loanType">
-              <option value="mortgage">Mortgage</option>
-              <option value="auto">Auto loan</option>
-              <option value="student">Student loan</option>
-              <option value="creditcard">Credit card</option>
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="principal">Loan balance (dollars)</label>
-            <input id="principal" type="number" inputmode="decimal" min="0" placeholder="350000" />
-            <div class="hint">This is the amount you borrowed (or still owe).</div>
-          </div>
-
-          <div class="field amortizedOnly">
-            <label for="termYears">Loan length (years)</label>
-            <input id="termYears" type="number" inputmode="numeric" min="1" placeholder="30" />
-          </div>
-
-          <div class="field">
-            <label for="apr">Annual interest rate (percent)</label>
-            <input id="apr" type="number" inputmode="decimal" min="0" step="0.01" placeholder="6.50" />
-            <div class="hint">Example: type <b>6.50</b> for 6.50%.</div>
-          </div>
-
-          <div class="field amortizedOnly">
-            <label for="extraPayment">Extra amount you pay each month (optional)</label>
-            <input id="extraPayment" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
-            <div class="hint">Extra payments can reduce total interest and shorten payoff time.</div>
-          </div>
-
-          <div class="field">
-            <label for="delta">Interest rate change (scenario)</label>
-            <select id="delta">
-              <option value="0">No change</option>
-              <option value="0.25">Increase by 0.25%</option>
-              <option value="0.50">Increase by 0.50%</option>
-              <option value="1.00">Increase by 1.00%</option>
-              <option value="custom">Custom change…</option>
-            </select>
-          </div>
-
-          <div class="field" id="customDeltaWrap" style="display:none;">
-            <label for="customDelta">Custom interest rate change (percent)</label>
-            <input id="customDelta" type="number" inputmode="decimal" step="0.01" placeholder="0.75" />
-          </div>
-
-          <!-- Mortgage-only: monthly housing costs -->
-          <div class="divider mortgageOnly"></div>
-          <div class="mortgageOnly">
-            <h2>Monthly housing costs (mortgage)</h2>
-
+          <div class="grid2">
             <div class="field">
-              <label for="annualTax">Property taxes (per year, dollars)</label>
-              <input id="annualTax" type="number" inputmode="decimal" min="0" step="1" placeholder="7200" />
-              <div class="hint">Converted to monthly by dividing by 12.</div>
+              <label for="loanType">Loan type</label>
+              <select id="loanType">
+                <option value="mortgage" selected>Mortgage</option>
+                <option value="auto">Auto loan</option>
+                <option value="student">Student loan</option>
+                <option value="creditcard">Credit card</option>
+              </select>
             </div>
 
             <div class="field">
-              <label for="annualIns">Homeowners insurance (per year, dollars)</label>
-              <input id="annualIns" type="number" inputmode="decimal" min="0" step="1" placeholder="1800" />
-              <div class="hint">Converted to monthly by dividing by 12.</div>
+              <label for="principal">Loan balance (dollars)</label>
+              <input id="principal" inputmode="decimal" placeholder="e.g., 350000" />
+            </div>
+
+            <div class="field amortizedOnly">
+              <label for="termYears">Loan length (years)</label>
+              <input id="termYears" inputmode="decimal" placeholder="e.g., 30" />
             </div>
 
             <div class="field">
-              <label for="monthlyHOA">HOA or other monthly housing fees (per month, dollars)</label>
-              <input id="monthlyHOA" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
-              <div class="hint">These affect your budget but do not change loan interest math.</div>
+              <label for="apr">Annual interest rate (percent)</label>
+              <input id="apr" inputmode="decimal" placeholder="e.g., 6.50" />
+              <div class="hint">Tip: Use <b>Live Rates</b> below to auto-fill this.</div>
             </div>
-          </div>
 
-          <!-- Credit card-only inputs -->
-          <div class="divider creditOnly"></div>
-          <div class="field creditOnly">
-            <label for="ccMode">Credit card payment style</label>
-            <select id="ccMode">
-              <option value="minimum">Minimum payment (2% or $25)</option>
-              <option value="fixed">Fixed monthly payment</option>
-            </select>
-          </div>
+            <div class="field amortizedOnly">
+              <label for="extraPayment">Extra monthly payment (dollars)</label>
+              <input id="extraPayment" inputmode="decimal" value="0" />
+            </div>
 
-          <div class="field creditOnly">
-            <label for="ccFixedPayment">Fixed payment amount (dollars)</label>
-            <input id="ccFixedPayment" type="number" inputmode="decimal" min="0" placeholder="200" />
-            <div class="hint">Only used if you choose “Fixed monthly payment.”</div>
+            <div class="field">
+              <label for="delta">Scenario: rate increase by</label>
+              <select id="delta">
+                <option value="0" selected>0.00%</option>
+                <option value="0.25">0.25%</option>
+                <option value="0.50">0.50%</option>
+                <option value="1.00">1.00%</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+
+            <div class="field" id="customDeltaWrap" style="display:none;">
+              <label for="customDelta">Custom increase (percent)</label>
+              <input id="customDelta" inputmode="decimal" placeholder="e.g., 1.75" />
+            </div>
+
+            <!-- Credit card controls -->
+            <div class="field creditOnly" style="display:none;">
+              <label for="ccMode">Credit card payment style</label>
+              <select id="ccMode">
+                <option value="minimum" selected>Minimum payment (approx.)</option>
+                <option value="fixed">Fixed payment</option>
+              </select>
+            </div>
+
+            <div class="field creditOnly" style="display:none;">
+              <label for="ccFixedPayment">Fixed monthly payment (dollars)</label>
+              <input id="ccFixedPayment" inputmode="decimal" placeholder="e.g., 200" />
+            </div>
+
+            <!-- Mortgage add-ons -->
+            <div class="field mortgageOnly">
+              <label for="annualTax">Annual property tax (dollars)</label>
+              <input id="annualTax" inputmode="decimal" placeholder="e.g., 7200" />
+            </div>
+
+            <div class="field mortgageOnly">
+              <label for="annualIns">Annual homeowners insurance (dollars)</label>
+              <input id="annualIns" inputmode="decimal" placeholder="e.g., 1800" />
+            </div>
+
+            <div class="field mortgageOnly">
+              <label for="monthlyHOA">Monthly HOA / condo fees (dollars)</label>
+              <input id="monthlyHOA" inputmode="decimal" value="0" />
+            </div>
           </div>
 
           <div class="actions">
@@ -168,351 +133,485 @@
             <button id="resetBtn" class="btn">Reset</button>
           </div>
 
-          <details class="assumptions">
-            <summary>What this calculator assumes</summary>
-            <ul>
-              <li>Fixed-rate loan math (educational model).</li>
-              <li>Extra payments reduce the loan balance faster.</li>
-              <li>Taxes/insurance/fees are added to your budget, not to interest math.</li>
-              <li>Educational only — not financial advice.</li>
-            </ul>
-          </details>
-        </aside>
+          <div id="status" class="status"></div>
 
-        <!-- RIGHT: Outputs -->
-        <section class="panel">
-          <h2>Results</h2>
+          <div class="miniActions">
+            <button id="copyBtn" class="btn small">Copy summary</button>
+            <button id="shareBtn" class="btn small">Copy share link</button>
+            <button id="csvBtn" class="btn small">Download schedule (CSV)</button>
+            <button id="printBtn" class="btn small">Print</button>
+            <button id="pdfBtn" class="btn small">Download PDF</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Results</h3>
 
           <div class="results">
             <div class="resultCard">
-              <div class="k">Baseline monthly loan payment</div>
-              <div class="v" id="baseMonthly">—</div>
-              <div class="s" id="baseNote"></div>
+              <div class="k">Baseline monthly payment</div>
+              <div id="baseMonthly" class="v">—</div>
+              <div id="baseNote" class="s"></div>
             </div>
 
             <div class="resultCard">
-              <div class="k">Scenario monthly loan payment</div>
-              <div class="v" id="newMonthly">—</div>
-              <div class="s" id="deltaMonthly">—</div>
+              <div class="k">Scenario monthly payment</div>
+              <div id="newMonthly" class="v">—</div>
+              <div id="deltaMonthly" class="s">—</div>
             </div>
 
             <div class="resultCard">
-              <div class="k">Baseline total interest paid</div>
-              <div class="v" id="baseInterest">—</div>
-              <div class="s" id="baseTotalPaid">—</div>
+              <div class="k">Baseline total interest</div>
+              <div id="baseInterest" class="v">—</div>
+              <div id="baseTotalPaid" class="s">—</div>
             </div>
 
             <div class="resultCard">
-              <div class="k">Scenario total interest paid</div>
-              <div class="v" id="newInterest">—</div>
-              <div class="s" id="deltaInterest">—</div>
+              <div class="k">Scenario total interest</div>
+              <div id="newInterest" class="v">—</div>
+              <div id="deltaInterest" class="s">—</div>
             </div>
           </div>
 
-          <!-- Explain Mode (upgrade #3) -->
-          <div class="box mt" id="explainBox" style="display:none;">
-            <h3>Explain (plain English)</h3>
-            <div id="explainText" class="explainText">Run a calculation to see an explanation.</div>
-          </div>
-
-          <!-- Mortgage: total monthly housing cost -->
-          <div class="results mt mortgageOnly" id="pitiRow" style="display:none;">
-            <div class="resultCard">
-              <div class="k">Baseline total monthly housing cost</div>
-              <div class="v" id="basePITI">—</div>
-              <div class="s">Loan payment + taxes + insurance + housing fees</div>
+          <div id="pitiRow" class="box" style="display:none;">
+            <h4>Total monthly housing cost (mortgage)</h4>
+            <div class="grid2">
+              <div><span class="muted">Baseline</span><div id="basePITI" class="big">—</div></div>
+              <div><span class="muted">Scenario</span><div id="newPITI" class="big">—</div></div>
             </div>
-            <div class="resultCard">
-              <div class="k">Scenario total monthly housing cost</div>
-              <div class="v" id="newPITI">—</div>
-              <div class="s" id="deltaPITI">—</div>
-            </div>
-            <div class="resultCard">
-              <div class="k">Monthly taxes/insurance/fees</div>
-              <div class="v" id="pitiAddons">—</div>
-              <div class="s">These are added to your budget</div>
-            </div>
-            <div class="resultCard">
-              <div class="k">Change in total monthly housing cost</div>
-              <div class="v" id="pitiDeltaAbs">—</div>
-              <div class="s" id="pitiDeltaPct">—</div>
+            <div class="muted">Includes monthly loan payment + monthly property tax + monthly insurance + monthly fees.</div>
+            <div class="grid3 smallGrid">
+              <div><span class="muted">Add-ons (monthly)</span><div id="pitiAddons">—</div></div>
+              <div><span class="muted">Change (dollars)</span><div id="pitiDeltaAbs">—</div></div>
+              <div><span class="muted">Change (percent)</span><div id="pitiDeltaPct">—</div></div>
             </div>
           </div>
 
-          <div class="twoCol mt">
-            <div class="box">
-              <h3>Scenario table</h3>
-              <div class="tableWrap">
-                <table id="scenarioTable">
-                  <thead>
-                    <tr>
-                      <th>Scenario</th>
-                      <th>Annual rate</th>
-                      <th>Monthly payment</th>
-                      <th>Total interest</th>
-                      <th>Change in monthly</th>
-                      <th>Change in interest</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr><td colspan="6" class="muted">Run a calculation to populate scenarios.</td></tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="small muted mt8">
-                Tip: for mortgages, the table shows the loan payment (not taxes/insurance/fees). The “Total monthly housing cost” cards include those.
-              </div>
+          <div class="twoCol">
+            <div class="box tableWrap">
+              <h4>Scenario table</h4>
+              <table id="scenarioTable">
+                <thead>
+                  <tr>
+                    <th>Scenario</th>
+                    <th>APR</th>
+                    <th>Monthly payment</th>
+                    <th>Total interest</th>
+                    <th>Δ monthly</th>
+                    <th>Δ interest</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td colspan="6" class="muted">Run a calculation to populate scenarios.</td></tr>
+                </tbody>
+              </table>
             </div>
 
             <div class="box">
-              <h3>Refinance estimate</h3>
-              <p class="muted small">For mortgage/auto/student loans (not credit cards).</p>
-
-              <div class="field">
-                <label for="refiNewApr">New annual interest rate (percent)</label>
-                <input id="refiNewApr" type="number" inputmode="decimal" step="0.01" placeholder="5.75" />
+              <h4>Refinance estimate (optional)</h4>
+              <div class="grid2">
+                <div class="field">
+                  <label for="refiNewApr">New annual interest rate (percent)</label>
+                  <input id="refiNewApr" inputmode="decimal" placeholder="e.g., 6.25" />
+                </div>
+                <div class="field">
+                  <label for="refiClosingCosts">One-time refinance costs (dollars)</label>
+                  <input id="refiClosingCosts" inputmode="decimal" placeholder="e.g., 4500" />
+                </div>
+                <div class="field">
+                  <label for="refiKeepYears">How long you will keep the loan (years)</label>
+                  <input id="refiKeepYears" inputmode="decimal" placeholder="e.g., 5" />
+                </div>
               </div>
-              <div class="field">
-                <label for="refiClosingCosts">One-time refinance costs (dollars)</label>
-                <input id="refiClosingCosts" type="number" inputmode="decimal" step="1" placeholder="3000" />
-              </div>
-              <div class="field">
-                <label for="refiKeepYears">How long you will keep the loan (years)</label>
-                <input id="refiKeepYears" type="number" inputmode="decimal" step="0.5" placeholder="5" />
-              </div>
-
-              <div class="refiOut">
-                <div class="k">Estimated time to break even</div>
-                <div class="v" id="refiBreakeven">—</div>
-                <div class="s" id="refiSavings">—</div>
+              <div class="mutedRow">
+                <div><span class="muted">Break-even</span><div id="refiBreakeven" class="big">—</div></div>
+                <div><span class="muted">Savings</span><div id="refiSavings" class="big">—</div></div>
               </div>
             </div>
           </div>
 
-          <!-- Chart (upgrade #1) -->
-          <div class="box mt chartBox">
+          <div class="box">
             <div class="chartHeader">
-              <div>
-                <h3>Chart</h3>
-                <div class="muted small">Shows the baseline schedule (includes extra monthly payments if set).</div>
-              </div>
-              <div class="chartBtns no-print">
-                <button class="btn smallBtn" id="chartBalanceBtn">Remaining balance</button>
-                <button class="btn smallBtn" id="chartSplitBtn">Monthly interest vs principal</button>
-                <button class="btn smallBtn" id="chartCumIntBtn">Cumulative interest paid</button>
-                <button class="btn smallBtn" id="chartDownloadBtn">Download chart</button>
+              <h4>Chart</h4>
+              <div class="seg">
+                <button id="chartBalanceBtn" class="btn small">Balance</button>
+                <button id="chartSplitBtn" class="btn small">Interest vs principal</button>
               </div>
             </div>
-
             <div class="chartCanvasWrap">
               <canvas id="chart"></canvas>
             </div>
           </div>
 
-          <div class="footnote">Educational only. Not financial advice.</div>
-        </section>
-      </div>
-
-      <!-- PRINT REPORT -->
-      <section id="report" class="print-only">
-        <h1>RateSense Report</h1>
-        <div class="muted small" id="reportDate"></div>
-
-        <h2>Inputs</h2>
-        <pre class="reportBox" id="reportInputs">—</pre>
-
-        <h2>Results</h2>
-        <pre class="reportBox" id="reportResults">—</pre>
-
-        <h2>Refinance estimate</h2>
-        <pre class="reportBox" id="reportRefi">—</pre>
-
-        <h2>Notes</h2>
-        <div class="muted small">
-          Educational only. Not financial advice. Taxes/insurance/fees are budget add-ons and do not change loan interest math.
+          <!-- PRINT/PDF REPORT TEXT -->
+          <section class="printOnly">
+            <h3>RateSense Report</h3>
+            <div id="reportDate" class="muted"></div>
+            <pre id="reportInputs" class="report"></pre>
+            <pre id="reportResults" class="report"></pre>
+            <pre id="reportRefi" class="report"></pre>
+          </section>
         </div>
-      </section>
+      </div>
     </section>
 
-    <!-- COMPARE MODE -->
-    <section id="compare" class="card">
-      <div class="topRow">
-        <div class="topLeft">
-          <h1>Compare</h1>
-          <p class="muted">
-            Compare Loan A vs Loan B side-by-side (monthly payment, total interest, payoff time, and for mortgages: total monthly housing cost).
-          </p>
+    <!-- LIVE RATES -->
+    <section id="liveRates" class="card">
+      <h2>Live Rates</h2>
+      <p class="muted">
+        Pulls the latest published rates. If your browser blocks the request, the app auto-tries a public CORS reader.
+      </p>
+
+      <div class="twoCol">
+        <div class="box">
+          <h4>Mortgage rates (Freddie Mac PMMS)</h4>
+          <div class="grid2">
+            <div class="field">
+              <label for="pmmsProduct">Pick a PMMS rate</label>
+              <select id="pmmsProduct">
+                <option value="30" selected>30-year fixed</option>
+                <option value="15">15-year fixed</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Latest PMMS rate</label>
+              <div id="pmmsValue" class="big">—</div>
+              <div id="pmmsMeta" class="muted"></div>
+            </div>
+          </div>
+          <div class="actions">
+            <button id="pmmsFetchBtn" class="btn primary">Fetch latest PMMS</button>
+            <button id="pmmsApplyBtn" class="btn">Use this rate in calculator</button>
+          </div>
+          <div id="pmmsStatus" class="status"></div>
         </div>
 
-        <div class="topActions no-print">
-          <button id="compareCopyBtn" class="btn">Copy comparison</button>
-          <button id="compareBtn" class="btn primary">Run comparison</button>
-          <span id="compareStatus" class="status"></span>
+        <div class="box">
+          <h4>Treasury yields (Daily yield curve)</h4>
+          <div class="grid2">
+            <div class="field">
+              <label for="tsyMaturity">Pick a maturity</label>
+              <select id="tsyMaturity">
+                <option value="1 Mo">1 month</option>
+                <option value="3 Mo">3 months</option>
+                <option value="6 Mo">6 months</option>
+                <option value="1 Yr">1 year</option>
+                <option value="2 Yr">2 years</option>
+                <option value="5 Yr">5 years</option>
+                <option value="10 Yr" selected>10 years</option>
+                <option value="30 Yr">30 years</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Latest yield</label>
+              <div id="tsyValue" class="big">—</div>
+              <div id="tsyMeta" class="muted"></div>
+            </div>
+          </div>
+          <div class="actions">
+            <button id="tsyFetchBtn" class="btn primary">Fetch latest Treasury yield</button>
+            <button id="tsyApplyBtn" class="btn">Use this rate in calculator</button>
+          </div>
+          <div id="tsyStatus" class="status"></div>
         </div>
       </div>
+    </section>
+
+    <!-- STRESS TEST -->
+    <section id="stress" class="card">
+      <h2>Rate Shock Stress Test</h2>
+      <p class="muted">
+        Two ways to stress test:
+        <b>Simple Steps</b> (rate increases by a fixed amount),
+        or <b>ARM Mode</b> (fixed period, then index + margin with caps).
+      </p>
+
+      <div class="twoCol">
+        <div class="box">
+          <h4>Stress inputs</h4>
+
+          <div class="grid2">
+            <div class="field">
+              <label for="stMode">Stress mode</label>
+              <select id="stMode">
+                <option value="steps" selected>Simple steps (add a percent each reset)</option>
+                <option value="arm">ARM mode (fixed period, then index + margin)</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="stBaseApr">Starting annual interest rate (percent)</label>
+              <input id="stBaseApr" inputmode="decimal" placeholder="e.g., 6.50" />
+              <div class="hint">Tip: click “Use calculator inputs” below.</div>
+            </div>
+
+            <div class="field">
+              <label for="stPrincipal">Starting balance (dollars)</label>
+              <input id="stPrincipal" inputmode="decimal" placeholder="e.g., 350000" />
+            </div>
+
+            <div class="field">
+              <label for="stTermYears">Original term length (years)</label>
+              <input id="stTermYears" inputmode="decimal" placeholder="e.g., 30" />
+            </div>
+
+            <div class="field">
+              <label for="stExtra">Extra monthly payment (dollars)</label>
+              <input id="stExtra" inputmode="decimal" value="0" />
+            </div>
+
+            <!-- SIMPLE STEPS -->
+            <div class="field stStepsOnly">
+              <label for="stPreset">Preset path</label>
+              <select id="stPreset">
+                <option value="none" selected>No preset (use custom)</option>
+                <option value="gentle">+0.25% every 6 months for 2 years</option>
+                <option value="moderate">+0.25% every 3 months for 2 years</option>
+                <option value="shock">+0.50% every 3 months for 18 months</option>
+              </select>
+            </div>
+
+            <div class="field stStepsOnly">
+              <label for="stStep">Step size (percent per step)</label>
+              <input id="stStep" inputmode="decimal" value="0.25" />
+            </div>
+
+            <div class="field stStepsOnly">
+              <label for="stEveryMonths">Step frequency (months)</label>
+              <input id="stEveryMonths" inputmode="decimal" value="3" />
+            </div>
+
+            <div class="field stStepsOnly">
+              <label for="stDurationMonths">Path duration (months)</label>
+              <input id="stDurationMonths" inputmode="decimal" value="24" />
+            </div>
+
+            <div class="field stStepsOnly">
+              <label for="stCapApr">Optional interest rate cap (percent)</label>
+              <input id="stCapApr" inputmode="decimal" placeholder="e.g., 10.00" />
+            </div>
+
+            <!-- ARM MODE -->
+            <div class="field stArmOnly" style="display:none;">
+              <label for="armFixedYears">Fixed period (years)</label>
+              <input id="armFixedYears" inputmode="decimal" value="5" />
+            </div>
+
+            <div class="field stArmOnly" style="display:none;">
+              <label for="armAdjustEveryMonths">Adjust frequency after fixed period (months)</label>
+              <input id="armAdjustEveryMonths" inputmode="decimal" value="12" />
+            </div>
+
+            <div class="field stArmOnly" style="display:none;">
+              <label for="armIndexSource">Index source</label>
+              <select id="armIndexSource">
+                <option value="manual" selected>Manual (type your own index)</option>
+                <option value="treasury">Use fetched Treasury yield</option>
+              </select>
+            </div>
+
+            <div class="field stArmOnly" style="display:none;">
+              <label for="armIndexValue">Index rate (percent)</label>
+              <input id="armIndexValue" inputmode="decimal" placeholder="e.g., 4.80" />
+              <div class="hint">If using Treasury yield, this auto-fills from Live Rates after you fetch it.</div>
+            </div>
+
+            <div class="field stArmOnly" style="display:none;">
+              <label for="armIndexMaturity">If using Treasury: pick maturity</label>
+              <select id="armIndexMaturity">
+                <option value="1 Yr" selected>1 year</option>
+                <option value="2 Yr">2 years</option>
+                <option value="5 Yr">5 years</option>
+                <option value="10 Yr">10 years</option>
+              </select>
+            </div>
+
+            <div class="field stArmOnly" style="display:none;">
+              <label for="armMargin">Margin added to index (percent)</label>
+              <input id="armMargin" inputmode="decimal" value="2.75" />
+            </div>
+
+            <div class="field stArmOnly" style="display:none;">
+              <label for="armPeriodicCap">Periodic cap per adjustment (percent)</label>
+              <input id="armPeriodicCap" inputmode="decimal" value="2.00" />
+              <div class="hint">Example: “2/2/5” means 2% periodic cap.</div>
+            </div>
+
+            <div class="field stArmOnly" style="display:none;">
+              <label for="armLifetimeCap">Lifetime cap above start (percent)</label>
+              <input id="armLifetimeCap" inputmode="decimal" value="5.00" />
+              <div class="hint">Example: “2/2/5” means max start + 5%.</div>
+            </div>
+
+            <div class="field stArmOnly" style="display:none;">
+              <label for="armFloor">Optional floor rate (percent)</label>
+              <input id="armFloor" inputmode="decimal" placeholder="e.g., 3.00" />
+            </div>
+
+            <div class="field stArmOnly" style="display:none;">
+              <label for="armSimYears">How many years to simulate (optional)</label>
+              <input id="armSimYears" inputmode="decimal" placeholder="e.g., 10" />
+              <div class="hint">Leave blank to simulate until payoff.</div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="stUseCalcBtn" class="btn">Use calculator inputs</button>
+            <button id="stRunBtn" class="btn primary">Run stress test</button>
+          </div>
+
+          <div id="stStatus" class="status"></div>
+        </div>
+
+        <div class="box">
+          <h4>Stress results</h4>
+          <div class="results">
+            <div class="resultCard">
+              <div class="k">Worst monthly payment</div>
+              <div id="stWorstPayment" class="v">—</div>
+              <div id="stWorstWhen" class="s"></div>
+            </div>
+            <div class="resultCard">
+              <div class="k">Total interest paid</div>
+              <div id="stTotalInterest" class="v">—</div>
+              <div id="stPayoff" class="s"></div>
+            </div>
+            <div class="resultCard">
+              <div class="k">Simple budget risk score</div>
+              <div id="stRisk" class="v">—</div>
+              <div class="s">Based on percent jump from starting payment.</div>
+            </div>
+            <div class="resultCard">
+              <div class="k">Peak rate reached</div>
+              <div id="stPeakRate" class="v">—</div>
+              <div id="stPeakMeta" class="s"></div>
+            </div>
+          </div>
+
+          <div class="box tableWrap" style="margin-top:12px;">
+            <h4>Stress timeline (first 36 rows)</h4>
+            <table id="stTable">
+              <thead>
+                <tr>
+                  <th>Month</th><th>APR</th><th>Payment</th><th>Interest</th><th>Principal</th><th>Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="6" class="muted">Run the stress test to populate this table.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="box" style="margin-top:12px;">
+            <h4>Stress chart</h4>
+            <div class="chartCanvasWrap" style="height:320px;">
+              <canvas id="stChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPARE -->
+    <section id="compare" class="card">
+      <h2>Compare mode</h2>
 
       <div class="compareGrid">
-        <div class="panel">
-          <h2>Loan A</h2>
-          <div class="field">
-            <label for="aType">Loan type</label>
-            <select id="aType">
-              <option value="mortgage">Mortgage</option>
-              <option value="auto">Auto</option>
-              <option value="student">Student</option>
-            </select>
+        <div class="box">
+          <h4>Loan A</h4>
+          <div class="grid2">
+            <div class="field"><label for="aType">Type</label>
+              <select id="aType"><option value="mortgage" selected>Mortgage</option><option value="auto">Auto</option><option value="student">Student</option></select>
+            </div>
+            <div class="field"><label for="aP">Balance</label><input id="aP" inputmode="decimal"></div>
+            <div class="field"><label for="aTerm">Years</label><input id="aTerm" inputmode="decimal"></div>
+            <div class="field"><label for="aApr">APR (%)</label><input id="aApr" inputmode="decimal"></div>
+            <div class="field"><label for="aExtra">Extra monthly</label><input id="aExtra" inputmode="decimal" value="0"></div>
+            <div class="field"><label for="aTax">Annual tax (mortgage)</label><input id="aTax" inputmode="decimal"></div>
+            <div class="field"><label for="aIns">Annual insurance (mortgage)</label><input id="aIns" inputmode="decimal"></div>
+            <div class="field"><label for="aHoa">Monthly fees (mortgage)</label><input id="aHoa" inputmode="decimal" value="0"></div>
           </div>
-          <div class="field"><label for="aP">Loan balance (dollars)</label><input id="aP" type="number" /></div>
-          <div class="field"><label for="aTerm">Loan length (years)</label><input id="aTerm" type="number" /></div>
-          <div class="field"><label for="aApr">Annual interest rate (percent)</label><input id="aApr" type="number" step="0.01"/></div>
-          <div class="field"><label for="aExtra">Extra amount paid each month (optional)</label><input id="aExtra" type="number" /></div>
-
-          <div class="divider"></div>
-          <h2>Monthly housing costs (Loan A)</h2>
-          <div class="field"><label for="aTax">Property taxes (per year)</label><input id="aTax" type="number" /></div>
-          <div class="field"><label for="aIns">Homeowners insurance (per year)</label><input id="aIns" type="number" /></div>
-          <div class="field"><label for="aHoa">HOA or other monthly housing fees (per month)</label><input id="aHoa" type="number" /></div>
         </div>
 
-        <div class="panel">
-          <h2>Loan B</h2>
-          <div class="field">
-            <label for="bType">Loan type</label>
-            <select id="bType">
-              <option value="mortgage">Mortgage</option>
-              <option value="auto">Auto</option>
-              <option value="student">Student</option>
-            </select>
+        <div class="box">
+          <h4>Loan B</h4>
+          <div class="grid2">
+            <div class="field"><label for="bType">Type</label>
+              <select id="bType"><option value="mortgage" selected>Mortgage</option><option value="auto">Auto</option><option value="student">Student</option></select>
+            </div>
+            <div class="field"><label for="bP">Balance</label><input id="bP" inputmode="decimal"></div>
+            <div class="field"><label for="bTerm">Years</label><input id="bTerm" inputmode="decimal"></div>
+            <div class="field"><label for="bApr">APR (%)</label><input id="bApr" inputmode="decimal"></div>
+            <div class="field"><label for="bExtra">Extra monthly</label><input id="bExtra" inputmode="decimal" value="0"></div>
+            <div class="field"><label for="bTax">Annual tax (mortgage)</label><input id="bTax" inputmode="decimal"></div>
+            <div class="field"><label for="bIns">Annual insurance (mortgage)</label><input id="bIns" inputmode="decimal"></div>
+            <div class="field"><label for="bHoa">Monthly fees (mortgage)</label><input id="bHoa" inputmode="decimal" value="0"></div>
           </div>
-          <div class="field"><label for="bP">Loan balance (dollars)</label><input id="bP" type="number" /></div>
-          <div class="field"><label for="bTerm">Loan length (years)</label><input id="bTerm" type="number" /></div>
-          <div class="field"><label for="bApr">Annual interest rate (percent)</label><input id="bApr" type="number" step="0.01"/></div>
-          <div class="field"><label for="bExtra">Extra amount paid each month (optional)</label><input id="bExtra" type="number" /></div>
-
-          <div class="divider"></div>
-          <h2>Monthly housing costs (Loan B)</h2>
-          <div class="field"><label for="bTax">Property taxes (per year)</label><input id="bTax" type="number" /></div>
-          <div class="field"><label for="bIns">Homeowners insurance (per year)</label><input id="bIns" type="number" /></div>
-          <div class="field"><label for="bHoa">HOA or other monthly housing fees (per month)</label><input id="bHoa" type="number" /></div>
         </div>
       </div>
 
-      <div class="box mt">
-        <h3>Comparison results</h3>
-        <div class="tableWrap">
-          <table id="compareTable">
-            <thead>
-              <tr>
-                <th>Metric</th>
-                <th>Loan A</th>
-                <th>Loan B</th>
-                <th>Difference (Loan B − Loan A)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="4" class="muted">Run comparison to see results.</td></tr>
-            </tbody>
-          </table>
-        </div>
+      <div class="actions" style="margin-top:12px;">
+        <button id="compareBtn" class="btn primary">Compare</button>
+        <button id="compareCopyBtn" class="btn">Copy comparison</button>
+        <div id="compareStatus" class="status"></div>
+      </div>
+
+      <div class="box tableWrap" style="margin-top:12px;">
+        <table id="compareTable">
+          <thead>
+            <tr><th>Metric</th><th>Loan A</th><th>Loan B</th><th>Difference (B − A)</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </div>
     </section>
 
-    <!-- SCENARIOS -->
-    <section id="scenarios" class="card">
-      <h1>Scenarios</h1>
-      <p class="muted">Click a scenario to auto-fill the calculator inputs.</p>
-
-      <div class="scenarioGrid">
-        <button class="scenario btn" data-scenario="mortgage350">
-          <div class="scenarioTitle">Typical mortgage</div>
-          <div class="scenarioDesc">$350,000 • 30 years • 6.50%</div>
-        </button>
-        <button class="scenario btn" data-scenario="auto25">
-          <div class="scenarioTitle">Auto loan</div>
-          <div class="scenarioDesc">$25,000 • 5 years • 7.90%</div>
-        </button>
-        <button class="scenario btn" data-scenario="student40">
-          <div class="scenarioTitle">Student loan</div>
-          <div class="scenarioDesc">$40,000 • 10 years • 6.00%</div>
-        </button>
-        <button class="scenario btn" data-scenario="cc4k">
-          <div class="scenarioTitle">Credit card payoff</div>
-          <div class="scenarioDesc">$4,000 • 24.00% • $200/mo</div>
-        </button>
-      </div>
-    </section>
-
-    <!-- SAVED (upgrade #2) -->
-    <section id="saved" class="card">
-      <div class="topRow">
-        <div class="topLeft">
-          <h1>Saved scenarios</h1>
-          <p class="muted">Save a named snapshot of your inputs. Stored locally in your browser.</p>
-        </div>
-
-        <div class="topActions no-print">
-          <input id="saveName" class="saveInput" placeholder="Name (e.g., ‘My Mortgage’)">
-          <button id="saveBtn" class="btn primary">Save current</button>
-          <span id="saveStatus" class="status"></span>
-        </div>
-      </div>
-
-      <div id="savedList" class="savedList">
-        <div class="muted">No saved scenarios yet.</div>
-      </div>
-    </section>
-
-    <!-- LEARN -->
-    <section id="learn" class="card">
-      <h1>Learn</h1>
-      <div class="learnGrid">
-        <div class="learnBox">
-          <h3>Annual interest rate</h3>
-          <p>This is the yearly interest rate. The calculator converts it into a monthly rate.</p>
-        </div>
-        <div class="learnBox">
-          <h3>Total interest paid</h3>
-          <p>This is how much money you pay in interest over the life of the loan.</p>
-        </div>
-        <div class="learnBox">
-          <h3>Total monthly housing cost (mortgages)</h3>
-          <p>
-            This includes your monthly loan payment (principal + interest) plus monthly property taxes,
-            monthly homeowners insurance, and any HOA or housing fees.
-          </p>
-        </div>
-        <div class="learnBox">
-          <h3>Extra monthly payments</h3>
-          <p>Paying extra each month can shorten the payoff time and reduce total interest.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ABOUT / METHODOLOGY (upgrade #4) -->
+    <!-- CASE STUDY -->
     <section id="about" class="card">
-      <h1>About</h1>
-      <p>RateSense is a student-built finance calculator designed to make interest-rate changes understandable.</p>
-      <p class="muted">Educational only. Not financial advice.</p>
+      <h2>Case Study (Resume Version)</h2>
 
-      <div id="methodology" class="box mt">
-        <h3>Methodology (portfolio-ready)</h3>
-        <ul class="bullets">
-          <li><b>Loan math:</b> Standard fixed-rate amortization formula for monthly payment.</li>
-          <li><b>Extra payments:</b> Added monthly and applied to principal after interest.</li>
-          <li><b>Scenario rate change:</b> Adds the selected increase to the annual interest rate.</li>
-          <li><b>Mortgage budget:</b> Adds monthly property tax + monthly insurance + monthly housing fees to the loan payment.</li>
-          <li><b>Refinance estimate:</b> Compares payment streams over a chosen “keep years” window and checks break-even vs one-time costs.</li>
-          <li><b>Limits:</b> Does not model variable rates, PMI, escrow changes, taxes, investment returns, or fees that vary over time.</li>
-        </ul>
+      <div class="twoCol">
+        <div class="box">
+          <h4>Problem</h4>
+          <p>
+            People see “rates up 0.50%” in the news but do not understand what it does to monthly cost,
+            payoff time, and total interest. Many calculators are single-scenario and do not support
+            stress testing or clean reports.
+          </p>
+
+          <h4>Solution</h4>
+          <ul class="bullets">
+            <li>Baseline vs scenario comparison for common loan types.</li>
+            <li>Stress test that simulates a rate path over time.</li>
+            <li>ARM mode (fixed period, index + margin, caps).</li>
+            <li>One-page PDF report for sharing.</li>
+          </ul>
+        </div>
+
+        <div class="box">
+          <h4>Methodology (simple + defensible)</h4>
+          <ul class="bullets">
+            <li>Amortization uses standard fixed-payment loan math.</li>
+            <li>Stress/ARM simulates resets: when APR changes, payment re-amortizes remaining balance over remaining term.</li>
+            <li>ARM uses index + margin with periodic and lifetime caps.</li>
+            <li>Credit card uses a minimum-payment approximation (2% or $25, with safety rules).</li>
+          </ul>
+
+          <h4>How to talk about this in interviews</h4>
+          <ul class="bullets">
+            <li>“I built a finance tool that turns rate headlines into dollar impact and risk.”</li>
+            <li>“I implemented an ARM model using index + margin with caps.”</li>
+            <li>“I packaged results into a PDF report for sharing.”</li>
+          </ul>
+        </div>
       </div>
     </section>
+
+    <footer class="footer">
+      <div class="muted">
+        Educational tool only. Not financial advice.
+      </div>
+    </footer>
   </main>
-
-  <footer class="wrap footer no-print">
-    <span class="muted">© RateSense • Built with HTML/CSS/JS • Educational only</span>
-    <a class="footerLink" href="#methodology">Methodology</a>
-  </footer>
-
-  <script src="app.js"></script>
 </body>
 </html>
