@@ -4,101 +4,23 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>RateSense — About</title>
-  <meta name="description" content="About RateSense: what it does, how to use it, and what the results mean." />
+  <meta name="description" content="What RateSense does and how to use it." />
   <link rel="stylesheet" href="./styles.css" />
 
-  <!-- Page-scoped layout fix (only affects About page) -->
+  <!-- Small patch: keep width consistent + keep nav on right (only if your CSS doesn't) -->
   <style>
-    .aboutPage { padding: 18px 0 28px; }
+    /* Match the normal site container width */
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 16px; }
 
-    .aboutHero {
-      margin: 18px 0 16px;
-      padding: 18px;
-      border-radius: 18px;
-      border: 1px solid rgba(255,255,255,.08);
-      background: rgba(255,255,255,.03);
-    }
-    .aboutHero h1 { margin: 0 0 8px; font-size: clamp(28px, 3vw, 40px); letter-spacing: -0.02em; }
-    .aboutHero p { margin: 0; opacity: .85; max-width: 70ch; line-height: 1.55; }
-
-    .aboutSection { margin-top: 14px; }
-    .aboutCard {
-      padding: 16px;
-      border-radius: 18px;
-      border: 1px solid rgba(255,255,255,.08);
-      background: rgba(10,12,18,.65);
-      box-shadow: 0 10px 30px rgba(0,0,0,.25);
-    }
-    .aboutCard h2 { margin: 0 0 12px; font-size: 20px; }
-    .aboutCard p { margin: 0; line-height: 1.55; opacity: .88; }
-    .aboutCard .muted { opacity: .78; }
-
-    .aboutGrid3 {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }
-    .aboutTwoCol {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      align-items: start;
-    }
-
-    .aboutPanel {
-      padding: 14px;
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,.08);
-      background: rgba(255,255,255,.03);
-    }
-    .aboutPanel h3 { margin: 0 0 8px; font-size: 16px; }
-    .aboutPanel ul, .aboutPanel ol { margin: 8px 0 0 18px; padding: 0; }
-    .aboutPanel li { margin: 6px 0; opacity: .88; line-height: 1.45; }
-
-    .aboutBtns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-    .aboutBtn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 10px 14px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.06);
-      text-decoration: none;
-      color: inherit;
-      font-weight: 600;
-    }
-    .aboutBtn.primary {
-      background: rgba(68, 164, 255, .20);
-      border-color: rgba(68, 164, 255, .35);
-    }
-
-    .aboutNote {
-      margin-top: 12px;
-      padding: 12px 14px;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,.10);
-      background: rgba(255,255,255,.04);
-      opacity: .9;
-      line-height: 1.5;
-    }
-
-    .aboutFooter {
-      margin-top: 16px;
-      opacity: .7;
-      font-size: 13px;
-      text-align: center;
-    }
-
-    @media (max-width: 980px) {
-      .aboutGrid3 { grid-template-columns: 1fr; }
-      .aboutTwoCol { grid-template-columns: 1fr; }
-    }
+    /* Force header alignment if a class mismatch broke it */
+    .header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+    .nav { margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
   </style>
 </head>
 
 <body>
-  <!-- Header / Nav -->
+  <!-- IMPORTANT: If your other pages use a different header markup, copy it from index.html -->
   <header class="header">
     <div class="wrap headerInner">
       <a class="brand" href="./index.html" aria-label="RateSense home">
@@ -124,112 +46,97 @@
     </div>
   </header>
 
-  <main class="wrap aboutPage">
-    <!-- Hero -->
-    <section class="aboutHero">
-      <h1>About RateSense</h1>
-      <p>
-        RateSense helps you understand what interest-rate changes mean in real dollars:
-        monthly payments, total interest, payoff timing, and “payment shock” risk over time.
+  <main class="wrap">
+    <section class="hero">
+      <h1>About</h1>
+      <p class="sub">
+        RateSense helps you understand how interest-rate changes affect real costs: monthly payments,
+        total interest, payoff time, and (on Stress Test) how payments could change if rates move over time.
       </p>
     </section>
 
-    <!-- What you can do -->
-    <section class="aboutSection aboutCard">
-      <h2>What you can do</h2>
+    <section class="card">
+      <h2>What RateSense does</h2>
 
-      <div class="aboutGrid3">
-        <div class="aboutPanel">
+      <div class="grid3">
+        <div class="panel">
           <h3>Calculator</h3>
-          <p class="muted">See baseline vs. rate-change scenarios across loan types.</p>
-          <div class="aboutBtns">
-            <a class="aboutBtn primary" href="./index.html#calculator">Open Calculator</a>
+          <p class="muted">
+            Enter your balance, rate, and loan length. RateSense shows the baseline result and what changes
+            under a selected rate-change scenario.
+          </p>
+          <div class="btnRow">
+            <a class="btn primary" href="./index.html#calculator">Open Calculator</a>
           </div>
         </div>
 
-        <div class="aboutPanel">
+        <div class="panel">
           <h3>Compare</h3>
-          <p class="muted">Compare two loan options side-by-side in one table.</p>
-          <div class="aboutBtns">
-            <a class="aboutBtn" href="./compare.html">Open Compare</a>
+          <p class="muted">
+            Compare two loan options side-by-side (payment, total interest, payoff time, and for mortgages,
+            total monthly housing cost when you include taxes/insurance/fees).
+          </p>
+          <div class="btnRow">
+            <a class="btn" href="./compare.html">Open Compare</a>
           </div>
         </div>
 
-        <div class="aboutPanel">
+        <div class="panel">
           <h3>Stress Test</h3>
-          <p class="muted">Simulate future rate paths and see worst-case payment risk.</p>
-          <div class="aboutBtns">
-            <a class="aboutBtn" href="./stress.html">Open Stress Test</a>
+          <p class="muted">
+            Simulate rising-rate paths and see the highest monthly payment risk over time.
+          </p>
+          <div class="btnRow">
+            <a class="btn" href="./stress.html">Open Stress Test</a>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- How to use -->
-    <section class="aboutSection aboutCard">
+    <section class="card">
       <h2>How to use it</h2>
 
-      <div class="aboutTwoCol">
-        <div class="aboutPanel">
-          <h3>Calculator steps</h3>
-          <ol>
+      <div class="twoCol">
+        <div class="panel">
+          <h3>Calculator</h3>
+          <ol class="list">
             <li>Select a loan type.</li>
-            <li>Enter balance, interest rate, and loan length (if applicable).</li>
-            <li>Choose a rate-change scenario (example: +0.50%).</li>
+            <li>Enter your loan balance and annual interest rate.</li>
+            <li>For amortized loans, enter the loan length in years (and optional extra monthly payment).</li>
+            <li>Select a rate-change scenario (example: +0.50%).</li>
             <li>Click <strong>Calculate</strong>.</li>
           </ol>
         </div>
 
-        <div class="aboutPanel">
+        <div class="panel">
           <h3>Mortgage housing cost</h3>
           <p class="muted">
-            If you add property taxes, insurance, and monthly fees, RateSense shows total monthly housing cost:
+            If you add property taxes, homeowner’s insurance, and monthly fees, RateSense shows your
+            total monthly housing cost:
           </p>
-          <p class="aboutNote">
-            <strong>Total housing cost</strong> = monthly loan payment + (annual taxes ÷ 12) + (annual insurance ÷ 12) + monthly fees
+          <p class="mono muted">
+            total housing cost = payment + (annual taxes ÷ 12) + (annual insurance ÷ 12) + monthly fees
           </p>
         </div>
       </div>
     </section>
 
-    <!-- What results mean -->
-    <section class="aboutSection aboutCard">
-      <h2>What the results mean</h2>
-
-      <div class="aboutGrid3">
-        <div class="aboutPanel">
-          <h3>Monthly payment</h3>
-          <p class="muted">The scheduled principal + interest payment for the loan.</p>
-        </div>
-
-        <div class="aboutPanel">
-          <h3>Total interest</h3>
-          <p class="muted">The total interest paid over the payoff period under your inputs.</p>
-        </div>
-
-        <div class="aboutPanel">
-          <h3>Payoff time</h3>
-          <p class="muted">How many months it takes to pay off the balance.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Notes -->
-    <section class="aboutSection aboutCard">
+    <section class="card">
       <h2>Important notes</h2>
-      <div class="aboutPanel">
-        <ul>
-          <li><strong>Estimates:</strong> Results are mathematical estimates based on what you enter.</li>
+      <div class="panel">
+        <ul class="list">
+          <li><strong>Estimates:</strong> Results are math estimates based on what you enter.</li>
           <li><strong>Real loans vary:</strong> Fees, escrow rules, and terms can change real outcomes.</li>
-          <li><strong>Not financial advice:</strong> This tool is educational/informational only.</li>
+          <li><strong>Not financial advice:</strong> Informational use only.</li>
         </ul>
       </div>
     </section>
 
-    <div class="aboutFooter">Educational tool only. Not financial advice.</div>
+    <footer class="footer">
+      <div class="muted">Educational tool only. Not financial advice.</div>
+    </footer>
   </main>
 
-  <!-- Mobile nav toggle -->
   <script>
     (function () {
       const btn = document.getElementById("menuBtn");
