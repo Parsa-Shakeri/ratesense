@@ -324,6 +324,7 @@
         Two ways to stress test:
         <b>Simple Steps</b> (rate increases by a fixed amount),
         or <b>ARM Mode</b> (fixed period, then index + margin with caps).
+        ARM mode also supports a changing index using Treasury history or a manual schedule.
       </p>
 
       <div class="twoCol">
@@ -393,6 +394,12 @@
 
             <!-- ARM MODE -->
             <div class="field stArmOnly" style="display:none;">
+              <label for="armStartDate">Start date (for Treasury history mode)</label>
+              <input id="armStartDate" type="date" />
+              <div class="hint">Used only when the index is based on Treasury history.</div>
+            </div>
+
+            <div class="field stArmOnly" style="display:none;">
               <label for="armFixedYears">Fixed period (years)</label>
               <input id="armFixedYears" inputmode="decimal" value="5" />
             </div>
@@ -403,27 +410,43 @@
             </div>
 
             <div class="field stArmOnly" style="display:none;">
-              <label for="armIndexSource">Index source</label>
-              <select id="armIndexSource">
-                <option value="manual" selected>Manual (type your own index)</option>
-                <option value="treasury">Use fetched Treasury yield</option>
+              <label for="armIndexMode">Index behavior</label>
+              <select id="armIndexMode">
+                <option value="constant" selected>Constant index (one number)</option>
+                <option value="treasury_history">Treasury history (changes over time)</option>
+                <option value="manual_schedule">Manual index schedule (one number per reset)</option>
               </select>
             </div>
 
             <div class="field stArmOnly" style="display:none;">
-              <label for="armIndexValue">Index rate (percent)</label>
-              <input id="armIndexValue" inputmode="decimal" placeholder="e.g., 4.80" />
-              <div class="hint">If using Treasury yield, this auto-fills from Live Rates after you fetch it.</div>
+              <label for="armIndexSource">Index source (for constant/history)</label>
+              <select id="armIndexSource">
+                <option value="manual" selected>Manual (type your own index)</option>
+                <option value="treasury">Use fetched Treasury yield (for constant)</option>
+              </select>
+              <div class="hint">Treasury history mode always pulls Treasury history (you pick maturity below).</div>
             </div>
 
             <div class="field stArmOnly" style="display:none;">
-              <label for="armIndexMaturity">If using Treasury: pick maturity</label>
+              <label for="armIndexValue">Index rate (percent) (constant mode)</label>
+              <input id="armIndexValue" inputmode="decimal" placeholder="e.g., 4.80" />
+              <div class="hint">If using Treasury (constant), this auto-fills after you fetch Live Rates.</div>
+            </div>
+
+            <div class="field stArmOnly" style="display:none;">
+              <label for="armIndexMaturity">Treasury maturity (for history mode)</label>
               <select id="armIndexMaturity">
                 <option value="1 Yr" selected>1 year</option>
                 <option value="2 Yr">2 years</option>
                 <option value="5 Yr">5 years</option>
                 <option value="10 Yr">10 years</option>
               </select>
+            </div>
+
+            <div class="field stArmOnly" style="display:none;">
+              <label for="armIndexSchedule">Manual index schedule (percent, one per reset)</label>
+              <textarea id="armIndexSchedule" rows="3" placeholder="Example: 4.80, 5.10, 4.95, 5.30"></textarea>
+              <div class="hint">Used only in “Manual index schedule” mode.</div>
             </div>
 
             <div class="field stArmOnly" style="display:none;">
@@ -583,7 +606,7 @@
           <ul class="bullets">
             <li>Baseline vs scenario comparison for common loan types.</li>
             <li>Stress test that simulates a rate path over time.</li>
-            <li>ARM mode (fixed period, index + margin, caps).</li>
+            <li>ARM mode (fixed period, index + margin, caps, changing index).</li>
             <li>One-page PDF report for sharing.</li>
           </ul>
         </div>
@@ -593,14 +616,14 @@
           <ul class="bullets">
             <li>Amortization uses standard fixed-payment loan math.</li>
             <li>Stress/ARM simulates resets: when APR changes, payment re-amortizes remaining balance over remaining term.</li>
-            <li>ARM uses index + margin with periodic and lifetime caps.</li>
-            <li>Credit card uses a minimum-payment approximation (2% or $25, with safety rules).</li>
+            <li>ARM uses index + margin with periodic and lifetime caps (optional floor).</li>
+            <li>History mode uses Treasury yields on or before reset dates.</li>
           </ul>
 
           <h4>How to talk about this in interviews</h4>
           <ul class="bullets">
             <li>“I built a finance tool that turns rate headlines into dollar impact and risk.”</li>
-            <li>“I implemented an ARM model using index + margin with caps.”</li>
+            <li>“I implemented an ARM model using index + margin with caps and a time-varying index.”</li>
             <li>“I packaged results into a PDF report for sharing.”</li>
           </ul>
         </div>
