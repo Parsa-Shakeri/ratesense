@@ -3,54 +3,38 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
   <title>RateSense — About</title>
   <meta name="description" content="What RateSense does and how to use it." />
   <link rel="stylesheet" href="./styles.css" />
-
-  <!-- Small patch: keep width consistent + keep nav on right (only if your CSS doesn't) -->
-  <style>
-    /* Match the normal site container width */
-    .wrap { max-width: 1120px; margin: 0 auto; padding: 16px; }
-
-    /* Force header alignment if a class mismatch broke it */
-    .header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
-    .nav { margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
-  </style>
 </head>
 
 <body>
-  <!-- IMPORTANT: If your other pages use a different header markup, copy it from index.html -->
-<header class="header headerDark">
-  <div class="wrap headerLayout">
+  <header class="header headerDark">
+    <div class="container headerLayout">
+      <nav class="navLeft" aria-label="Primary">
+        <a href="./index.html#calculator">Calculator</a>
+        <a href="./scenarios.html">Scenarios</a>
+        <a href="./compare.html">Compare</a>
+        <a href="./stress.html">Stress Test</a>
+        <a href="./rates.html">Rates</a>
+        <a class="active" href="./about.html">About</a>
+      </nav>
 
-    <!-- LEFT: Navigation -->
-    <nav class="nav navLeft" aria-label="Primary">
-      <a href="./index.html#calculator">Calculator</a>
-      <a href="./scenarios.html">Scenarios</a>
-      <a href="./compare.html">Compare</a>
-      <a href="./stress.html">Stress Test</a>
-      <a href="./rates.html">Rates</a>
-      <a href="./about.html">About</a>
-    </nav>
+      <a class="brandRight" href="./index.html" aria-label="RateSense home">
+        <div class="brandMark">RS</div>
+        <div class="brandText">
+          <div class="brandName">RateSense</div>
+          <div class="brandTag">Turn rate changes into real monthly impacts.</div>
+        </div>
+      </a>
+    </div>
+  </header>
 
-    <!-- RIGHT: Brand -->
-    <a class="brand brandRight" href="./index.html" aria-label="RateSense home">
-      <div class="brandMark">RS</div>
-      <div class="brandText">
-        <div class="brandName">RateSense</div>
-        <div class="brandTag">Turn rate changes into real monthly impacts.</div>
-      </div>
-    </a>
-
-  </div>
-</header>
-
-
-  <main class="wrap">
-    <section class="hero">
+  <main class="container">
+    <section class="pageTitle">
       <h1>About</h1>
-      <p class="sub">
+      <p class="muted">
         RateSense helps you understand how interest-rate changes affect real costs: monthly payments,
         total interest, payoff time, and (on Stress Test) how payments could change if rates move over time.
       </p>
@@ -59,35 +43,35 @@
     <section class="card">
       <h2>What RateSense does</h2>
 
-      <div class="grid3">
-        <div class="panel">
+      <div class="grid three">
+        <div class="subcard">
           <h3>Calculator</h3>
           <p class="muted">
             Enter your balance, rate, and loan length. RateSense shows the baseline result and what changes
             under a selected rate-change scenario.
           </p>
-          <div class="btnRow">
+          <div class="actions">
             <a class="btn primary" href="./index.html#calculator">Open Calculator</a>
           </div>
         </div>
 
-        <div class="panel">
+        <div class="subcard">
           <h3>Compare</h3>
           <p class="muted">
             Compare two loan options side-by-side (payment, total interest, payoff time, and for mortgages,
             total monthly housing cost when you include taxes/insurance/fees).
           </p>
-          <div class="btnRow">
+          <div class="actions">
             <a class="btn" href="./compare.html">Open Compare</a>
           </div>
         </div>
 
-        <div class="panel">
+        <div class="subcard">
           <h3>Stress Test</h3>
           <p class="muted">
-            Simulate rising-rate paths and see the highest monthly payment risk over time.
+            Simulate rising-rate paths and see how high monthly payments could go.
           </p>
-          <div class="btnRow">
+          <div class="actions">
             <a class="btn" href="./stress.html">Open Stress Test</a>
           </div>
         </div>
@@ -97,8 +81,8 @@
     <section class="card">
       <h2>How to use it</h2>
 
-      <div class="twoCol">
-        <div class="panel">
+      <div class="grid two">
+        <div class="subcard">
           <h3>Calculator</h3>
           <ol class="list">
             <li>Select a loan type.</li>
@@ -109,13 +93,13 @@
           </ol>
         </div>
 
-        <div class="panel">
+        <div class="subcard">
           <h3>Mortgage housing cost</h3>
           <p class="muted">
-            If you add property taxes, homeowner’s insurance, and monthly fees, RateSense shows your
+            If you add property taxes, homeowners insurance, and monthly fees, RateSense shows your
             total monthly housing cost:
           </p>
-          <p class="mono muted">
+          <p class="muted" style="font-family: var(--mono);">
             total housing cost = payment + (annual taxes ÷ 12) + (annual insurance ÷ 12) + monthly fees
           </p>
         </div>
@@ -124,36 +108,18 @@
 
     <section class="card">
       <h2>Important notes</h2>
-      <div class="panel">
+      <div class="subcard">
         <ul class="list">
           <li><strong>Estimates:</strong> Results are math estimates based on what you enter.</li>
-          <li><strong>Real loans vary:</strong> Fees, escrow rules, and terms can change real outcomes.</li>
+          <li><strong>Real loans vary:</strong> Fees, escrow rules, and terms can change outcomes.</li>
           <li><strong>Not financial advice:</strong> Informational use only.</li>
         </ul>
       </div>
     </section>
 
-    <footer class="footer">
+    <footer class="site-footer">
       <div class="muted">Educational tool only. Not financial advice.</div>
     </footer>
   </main>
-
-  <script>
-    (function () {
-      const btn = document.getElementById("menuBtn");
-      const nav = document.getElementById("nav");
-      if (!btn || !nav) return;
-      btn.addEventListener("click", () => {
-        const open = nav.classList.toggle("open");
-        btn.setAttribute("aria-expanded", open ? "true" : "false");
-      });
-      nav.querySelectorAll("a").forEach(a => {
-        a.addEventListener("click", () => {
-          nav.classList.remove("open");
-          btn.setAttribute("aria-expanded", "false");
-        });
-      });
-    })();
-  </script>
 </body>
 </html>
