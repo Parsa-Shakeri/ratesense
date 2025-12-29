@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>RateSense — Case Study</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <div class="brandMark">RS</div>
+      <div class="brandText">
+        <div class="brandTitle">RateSense</div>
+        <div class="brandSub">Rate impact, stress testing, and reporting.</div>
+      </div>
+    </a>
+
+    <button class="hamburger" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav class="nav" id="nav">
+      <a href="index.html">Calculator</a>
+      <a href="rates.html">Live Rates</a>
+      <a href="stress.html">Stress Test</a>
+      <a href="compare.html">Compare</a>
+      <a class="active" href="case-study.html">Case Study</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="pageTitle">
+      <h1>Case Study</h1>
+      <p class="muted">A clean “resume-ready” summary of what you built and why it matters.</p>
+    </section>
+
+    <section class="grid two">
+      <section class="card">
+        <h2>Problem</h2>
+        <p>
+          People hear “rates up 0.50%” but can’t translate that into monthly budget impact, total interest,
+          or the risk of future resets (especially for ARMs).
+        </p>
+
+        <h2>Solution</h2>
+        <ul class="bullets">
+          <li>Baseline vs scenario calculator across loan types</li>
+          <li>Stress testing: fixed steps or ARM behavior</li>
+          <li>ARM model: fixed period, index + margin, periodic + lifetime caps</li>
+          <li>Time-varying index: Treasury history or manual schedules</li>
+          <li>Exportable artifacts: share link, CSV, PDF report</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Implementation Highlights</h2>
+        <ul class="bullets">
+          <li>Amortization engine with principal/interest split and payoff timing</li>
+          <li>Stress simulation that re-amortizes at each reset</li>
+          <li>Robust data fetch strategy with best-effort proxy fallback</li>
+          <li>Professional UX: multi-page layout, responsive navigation, consistent design system</li>
+        </ul>
+
+        <h2>How to pitch it</h2>
+        <ul class="bullets">
+          <li>“I built a finance tool that converts rate headlines into dollar impact + risk.”</li>
+          <li>“I implemented ARM mechanics with caps and a time-varying index.”</li>
+          <li>“I shipped a report workflow (PDF/CSV/share link) for real usability.”</li>
+        </ul>
+      </section>
+    </section>
+
+    <footer class="site-footer">
+      <div class="muted">Educational tool only. Not financial advice.</div>
+    </footer>
+  </main>
+
+  <script>
+    // tiny menu toggle so this page works without other JS
+    const menuBtn = document.getElementById("menuBtn");
+    const nav = document.getElementById("nav");
+    menuBtn?.addEventListener("click", () => {
+      const open = nav.classList.toggle("open");
+      menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+  </script>
+</body>
+</html>
