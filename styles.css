@@ -36,6 +36,88 @@ a:hover{text-decoration:underline}
   margin: 0 auto;
   padding: 18px 18px 42px;
 }
+/* =========================================
+   Global Header (shared across all pages)
+   ========================================= */
+
+.headerDark {
+  background: #0b0f1b;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.headerLayout {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+/* LEFT NAV */
+.navLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.navLeft a {
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #a9b3c7;
+  font-weight: 500;
+}
+
+.navLeft a:hover {
+  background: rgba(255,255,255,0.08);
+  color: #e9edf5;
+}
+
+.navLeft a.active {
+  background: rgba(90,160,255,0.18);
+  color: #e9edf5;
+}
+
+/* RIGHT BRAND */
+.brandRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.brandRight,
+.brandRight * {
+  text-decoration: none !important;
+}
+
+.brandRight::before,
+.brandRight::after {
+  display: none !important;
+}
+
+/* Brand mark */
+.brandMark {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #4fa3ff, #6f7cff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: #0b0d12;
+}
+
+.brandName {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e9edf5;
+}
+
+.brandTag {
+  font-size: 12px;
+  opacity: 0.65;
+}
 
 .site-header{
   position: sticky;
