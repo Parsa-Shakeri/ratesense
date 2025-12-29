@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>RateSense — Stress Test</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="stress.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <div class="brandMark">RS</div>
+      <div class="brandText">
+        <div class="brandTitle">RateSense</div>
+        <div class="brandSub">Rate impact, stress testing, and reporting.</div>
+      </div>
+    </a>
+
+    <button class="hamburger" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav class="nav" id="nav">
+      <a href="index.html">Calculator</a>
+      <a href="rates.html">Live Rates</a>
+      <a class="active" href="stress.html">Stress Test</a>
+      <a href="compare.html">Compare</a>
+      <a href="case-study.html">Case Study</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="pageTitle">
+      <h1>Rate Shock Stress Test</h1>
+      <p class="muted">Simulate rate paths over time. ARM mode supports time-varying index via Treasury history or manual schedule.</p>
+    </section>
+
+    <section class="grid two">
+      <section class="card">
+        <div class="cardHeader">
+          <h2>Stress Inputs</h2>
+          <div class="pill">Simple steps or ARM</div>
+        </div>
+
+        <div class="formGrid two">
+          <div class="field">
+            <label for="stMode">Stress mode</label>
+            <select id="stMode">
+              <option value="steps" selected>Simple steps</option>
+              <option value="arm">ARM mode</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="stBaseApr">Starting APR (%)</label>
+            <input id="stBaseApr" inputmode="decimal" placeholder="e.g., 6.50" />
+          </div>
+
+          <div class="field">
+            <label for="stPrincipal">Starting balance ($)</label>
+            <input id="stPrincipal" inputmode="decimal" placeholder="e.g., 350000" />
+          </div>
+
+          <div class="field">
+            <label for="stTermYears">Original term (years)</label>
+            <input id="stTermYears" inputmode="decimal" placeholder="e.g., 30" />
+          </div>
+
+          <div class="field">
+            <label for="stExtra">Extra monthly payment ($)</label>
+            <input id="stExtra" inputmode="decimal" value="0" />
+          </div>
+
+          <!-- Steps -->
+          <div class="field stStepsOnly">
+            <label for="stPreset">Preset path</label>
+            <select id="stPreset">
+              <option value="none" selected>No preset</option>
+              <option value="gentle">+0.25% every 6 months for 2 years</option>
+              <option value="moderate">+0.25% every 3 months for 2 years</option>
+              <option value="shock">+0.50% every 3 months for 18 months</option>
+            </select>
+          </div>
+
+          <div class="field stStepsOnly">
+            <label for="stStep">Step size (%)</label>
+            <input id="stStep" inputmode="decimal" value="0.25" />
+          </div>
+
+          <div class="field stStepsOnly">
+            <label for="stEveryMonths">Step frequency (months)</label>
+            <input id="stEveryMonths" inputmode="decimal" value="3" />
+          </div>
+
+          <div class="field stStepsOnly">
+            <label for="stDurationMonths">Path duration (months)</label>
+            <input id="stDurationMonths" inputmode="decimal" value="24" />
+          </div>
+
+          <div class="field stStepsOnly">
+            <label for="stCapApr">Optional APR cap (%)</label>
+            <input id="stCapApr" inputmode="decimal" placeholder="e.g., 10.00" />
+          </div>
+
+          <!-- ARM -->
+          <div class="field stArmOnly" style="display:none;">
+            <label for="armStartDate">Start date (Treasury history mode)</label>
+            <input id="armStartDate" type="date" />
+          </div>
+
+          <div class="field stArmOnly" style="display:none;">
+            <label for="armFixedYears">Fixed period (years)</label>
+            <input id="armFixedYears" inputmode="decimal" value="5" />
+          </div>
+
+          <div class="field stArmOnly" style="display:none;">
+            <label for="armAdjustEveryMonths">Adjust frequency (months)</label>
+            <input id="armAdjustEveryMonths" inputmode="decimal" value="12" />
+          </div>
+
+          <div class="field stArmOnly" style="display:none;">
+            <label for="armIndexMode">Index behavior</label>
+            <select id="armIndexMode">
+              <option value="constant" selected>Constant index</option>
+              <option value="treasury_history">Treasury history (changes over time)</option>
+              <option value="manual_schedule">Manual index schedule</option>
+            </select>
+          </div>
+
+          <div class="field stArmOnly" style="display:none;">
+            <label for="armIndexValue">Index rate (%) (constant mode)</label>
+            <input id="armIndexValue" inputmode="decimal" placeholder="e.g., 4.80" />
+            <div class="hint">Use “Treasury history” or paste a manual schedule for time-varying index.</div>
+          </div>
+
+          <div class="field stArmOnly" style="display:none;">
+            <label for="armIndexMaturity">Treasury maturity (history mode)</label>
+            <select id="armIndexMaturity">
+              <option value="1 Yr" selected>1 year</option>
+              <option value="2 Yr">2 years</option>
+              <option value="5 Yr">5 years</option>
+              <option value="10 Yr">10 years</option>
+            </select>
+          </div>
+
+          <div class="field stArmOnly" style="display:none;">
+            <label for="armIndexSchedule">Manual index schedule (%, one per reset)</label>
+            <textarea id="armIndexSchedule" rows="3" placeholder="Example: 4.80, 5.10, 4.95, 5.30"></textarea>
+          </div>
+
+          <div class="field stArmOnly" style="display:none;">
+            <label for="armMargin">Margin (%)</label>
+            <input id="armMargin" inputmode="decimal" value="2.75" />
+          </div>
+
+          <div class="field stArmOnly" style="display:none;">
+            <label for="armPeriodicCap">Periodic cap per adjustment (%)</label>
+            <input id="armPeriodicCap" inputmode="decimal" value="2.00" />
+          </div>
+
+          <div class="field stArmOnly" style="display:none;">
+            <label for="armLifetimeCap">Lifetime cap above start (%)</label>
+            <input id="armLifetimeCap" inputmode="decimal" value="5.00" />
+          </div>
+
+          <div class="field stArmOnly" style="display:none;">
+            <label for="armFloor">Optional floor rate (%)</label>
+            <input id="armFloor" inputmode="decimal" placeholder="e.g., 3.00" />
+          </div>
+
+          <div class="field stArmOnly" style="display:none;">
+            <label for="armSimYears">Simulate years (optional)</label>
+            <input id="armSimYears" inputmode="decimal" placeholder="e.g., 10" />
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="stUseCalcBtn" class="btn">Use calculator inputs</button>
+          <button id="stRunBtn" class="btn primary">Run stress test</button>
+          <div id="stStatus" class="status"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="cardHeader">
+          <h2>Stress Results</h2>
+          <div class="pill">Risk view</div>
+        </div>
+
+        <div class="kpiGrid">
+          <div class="kpi">
+            <div class="k">Worst monthly payment</div>
+            <div id="stWorstPayment" class="v">—</div>
+            <div id="stWorstWhen" class="s muted"></div>
+          </div>
+          <div class="kpi">
+            <div class="k">Total interest paid</div>
+            <div id="stTotalInterest" class="v">—</div>
+            <div id="stPayoff" class="s muted"></div>
+          </div>
+          <div class="kpi">
+            <div class="k">Budget risk score</div>
+            <div id="stRisk" class="v">—</div>
+            <div class="s muted">Based on payment jump from start.</div>
+          </div>
+          <div class="kpi">
+            <div class="k">Peak rate reached</div>
+            <div id="stPeakRate" class="v">—</div>
+            <div id="stPeakMeta" class="s muted"></div>
+          </div>
+        </div>
+
+        <div class="subcard">
+          <h3>Stress chart</h3>
+          <div class="chartWrap tall">
+            <canvas id="stChart"></canvas>
+          </div>
+        </div>
+
+        <div class="subcard">
+          <h3>Timeline (first 36 rows)</h3>
+          <div class="tableWrap">
+            <table id="stTable">
+              <thead>
+                <tr><th>Month</th><th>APR</th><th>Payment</th><th>Interest</th><th>Principal</th><th>Balance</th></tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="6" class="muted">Run the stress test to populate this table.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+    </section>
+
+    <footer class="site-footer">
+      <div class="muted">Educational tool only. Not financial advice.</div>
+    </footer>
+  </main>
+</body>
+</html>
