@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RateSense — How it works</title>
+  <meta name="description" content="RateSense helps you understand how interest-rate changes affect monthly payments, total interest, and risk over time." />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+  <!-- Header / Nav (matches the rest of your site) -->
+  <header class="header">
+    <div class="wrap headerInner">
+      <a class="brand" href="./index.html" aria-label="RateSense home">
+        <div class="brandMark">RS</div>
+        <div class="brandText">
+          <div class="brandName">RateSense</div>
+          <div class="brandTag">Turn rate changes into real monthly impacts.</div>
+        </div>
+      </a>
+
+      <button id="menuBtn" class="menuBtn" aria-label="Menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+
+      <nav id="nav" class="nav" aria-label="Primary">
+        <a href="./index.html#calculator">Calculator</a>
+        <a href="./scenarios.html">Scenarios</a>
+        <a href="./compare.html">Compare</a>
+        <a href="./stress.html">Stress Test</a>
+        <a href="./rates.html">Rates</a>
+        <a class="active" href="./about.html">How it works</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Page title -->
+    <section class="hero">
+      <h1>How RateSense works</h1>
+      <p class="sub">
+        RateSense helps you understand what interest-rate changes mean in real dollars:
+        monthly payment impact, total interest paid, and “payment shock” risk over time.
+      </p>
+    </section>
+
+    <!-- Quick start -->
+    <section class="card">
+      <h2>Quick start</h2>
+      <div class="twoCol">
+        <div class="panel">
+          <h3>1) Use the Calculator</h3>
+          <ol class="list">
+            <li>Pick a loan type (Mortgage / Auto / Student / Credit Card).</li>
+            <li>Enter the balance, interest rate, and loan length (if applicable).</li>
+            <li>Choose a “rate change scenario” (like +0.25% or +1.00%).</li>
+            <li>Click <strong>Calculate</strong> to see the difference.</li>
+          </ol>
+          <div class="btnRow">
+            <a class="btn primary" href="./index.html#calculator">Go to Calculator</a>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>2) Compare two loans</h3>
+          <p class="muted">
+            Use Compare when you want to decide between two options (e.g., 6.25% vs 7.10%,
+            or 30-year vs 15-year).
+          </p>
+          <ul class="list">
+            <li>Enter Loan A and Loan B</li>
+            <li>Run comparison</li>
+            <li>Copy a summary to share</li>
+          </ul>
+          <div class="btnRow">
+            <a class="btn" href="./compare.html">Go to Compare</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- What you’ll see -->
+    <section class="card">
+      <h2>What the numbers mean</h2>
+
+      <div class="grid3">
+        <div class="panel">
+          <h3>Monthly payment</h3>
+          <p class="muted">
+            The scheduled payment for the loan (principal + interest). This is what changes most
+            when rates change.
+          </p>
+        </div>
+
+        <div class="panel">
+          <h3>Total interest</h3>
+          <p class="muted">
+            The total interest paid over the full payoff period (or simulated payoff period if you
+            make extra payments).
+          </p>
+        </div>
+
+        <div class="panel">
+          <h3>Payoff time</h3>
+          <p class="muted">
+            How many months it takes to fully pay off the balance under the inputs provided.
+          </p>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:12px;">
+        <h3>Mortgage: total monthly housing cost</h3>
+        <p class="muted">
+          If you add property taxes, homeowner’s insurance, and monthly fees, RateSense shows your
+          <strong>total monthly housing cost</strong>:
+        </p>
+        <p class="mono muted">
+          total monthly housing cost = monthly loan payment + (annual taxes ÷ 12) + (annual insurance ÷ 12) + monthly fees
+        </p>
+      </div>
+    </section>
+
+    <!-- Charts -->
+    <section class="card">
+      <h2>Charts</h2>
+      <div class="twoCol">
+        <div class="panel">
+          <h3>Remaining balance</h3>
+          <p class="muted">
+            Shows how quickly the balance falls over time. Helpful for seeing the long-run impact
+            of interest rate changes.
+          </p>
+        </div>
+        <div class="panel">
+          <h3>Interest vs principal</h3>
+          <p class="muted">
+            Splits each monthly payment into interest and principal. Early payments are mostly interest;
+            later payments shift toward principal.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stress test -->
+    <section class="card">
+      <h2>Stress Test (future rate risk)</h2>
+      <p class="muted">
+        The Stress Test page is for “what if rates rise over time?” It simulates changing rates month-by-month
+        and shows how high the payment could go.
+      </p>
+
+      <div class="twoCol">
+        <div class="panel">
+          <h3>Rate shocks</h3>
+          <p class="muted">
+            You can model simple increases like “+0.25% every 6 months for 2 years.”
+            This helps you understand payment shock risk.
+          </p>
+          <div class="btnRow">
+            <a class="btn" href="./stress.html">Go to Stress Test</a>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Adjustable-style resets</h3>
+          <p class="muted">
+            You can also model periodic resets (like adjustable-rate behavior) with a cap so the
+            rate can’t rise forever.
+          </p>
+        </div>
+      </div>
+
+      <div class="note">
+        <strong>Note:</strong> Stress Test is a simplified model to explore scenarios. Real-world loans can include
+        different reset rules, margins, caps, escrow, and fees.
+      </div>
+    </section>
+
+    <!-- Live rates -->
+    <section class="card">
+      <h2>Live rates</h2>
+      <p class="muted">
+        The Rates page can pull public data (like Treasury yields and mortgage benchmarks) so you can start
+        from something close to “today’s market.” If a data source is unavailable, the page may use a best-effort fallback.
+      </p>
+      <div class="btnRow">
+        <a class="btn" href="./rates.html">Go to Rates</a>
+      </div>
+    </section>
+
+    <!-- Examples -->
+    <section class="card">
+      <h2>Example inputs you can try</h2>
+      <div class="grid3">
+        <div class="panel">
+          <h3>Mortgage</h3>
+          <ul class="list">
+            <li>Balance: 350,000</li>
+            <li>Length: 30 years</li>
+            <li>Rate: 6.50%</li>
+            <li>Scenario: +0.50%</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Auto loan</h3>
+          <ul class="list">
+            <li>Balance: 25,000</li>
+            <li>Length: 5 years</li>
+            <li>Rate: 7.90%</li>
+            <li>Scenario: +0.25%</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Student loan</h3>
+          <ul class="list">
+            <li>Balance: 40,000</li>
+            <li>Length: 10 years</li>
+            <li>Rate: 6.00%</li>
+            <li>Scenario: +1.00%</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Limits / disclaimer -->
+    <section class="card">
+      <h2>Important notes</h2>
+      <div class="panel">
+        <ul class="list">
+          <li><strong>Estimates:</strong> Results are mathematical estimates based on what you enter.</li>
+          <li><strong>Fees and real loan terms vary:</strong> Real loans can include points, escrow rules, taxes, insurance changes, and special payment rules.</li>
+          <li><strong>Not financial advice:</strong> This tool is educational and informational only.</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="muted">Educational tool only. Not financial advice.</div>
+    </footer>
+  </main>
+
+  <!-- Tiny page JS: mobile nav toggle -->
+  <script>
+    (function () {
+      const btn = document.getElementById("menuBtn");
+      const nav = document.getElementById("nav");
+      if (!btn || !nav) return;
+      btn.addEventListener("click", () => {
+        const open = nav.classList.toggle("open");
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+      nav.querySelectorAll("a").forEach(a => {
+        a.addEventListener("click", () => {
+          nav.classList.remove("open");
+          btn.setAttribute("aria-expanded", "false");
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
