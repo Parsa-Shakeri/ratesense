@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>RateSense — Live Rates</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="rates.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <div class="brandMark">RS</div>
+      <div class="brandText">
+        <div class="brandTitle">RateSense</div>
+        <div class="brandSub">Rate impact, stress testing, and reporting.</div>
+      </div>
+    </a>
+
+    <button class="hamburger" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav class="nav" id="nav">
+      <a href="index.html">Calculator</a>
+      <a class="active" href="rates.html">Live Rates</a>
+      <a href="stress.html">Stress Test</a>
+      <a href="compare.html">Compare</a>
+      <a href="case-study.html">Case Study</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="pageTitle">
+      <h1>Live Rates</h1>
+      <p class="muted">Fetch the latest published rates (with a best-effort fallback if CORS blocks requests).</p>
+    </section>
+
+    <section class="grid two">
+      <section class="card">
+        <div class="cardHeader">
+          <h2>Mortgage rates (Freddie Mac PMMS)</h2>
+          <div class="pill">Weekly</div>
+        </div>
+
+        <div class="formGrid two">
+          <div class="field">
+            <label for="pmmsProduct">Pick a PMMS rate</label>
+            <select id="pmmsProduct">
+              <option value="30" selected>30-year fixed</option>
+              <option value="15">15-year fixed</option>
+            </select>
+          </div>
+          <div class="kpi compact">
+            <div class="k muted">Latest PMMS rate</div>
+            <div id="pmmsValue" class="v">—</div>
+            <div id="pmmsMeta" class="s muted"></div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="pmmsFetchBtn" class="btn primary">Fetch latest PMMS</button>
+          <button id="pmmsCopyBtn" class="btn">Copy rate</button>
+        </div>
+        <div id="pmmsStatus" class="status"></div>
+      </section>
+
+      <section class="card">
+        <div class="cardHeader">
+          <h2>Treasury yields (Daily yield curve)</h2>
+          <div class="pill">Daily</div>
+        </div>
+
+        <div class="formGrid two">
+          <div class="field">
+            <label for="tsyMaturity">Pick a maturity</label>
+            <select id="tsyMaturity">
+              <option value="1 Mo">1 month</option>
+              <option value="3 Mo">3 months</option>
+              <option value="6 Mo">6 months</option>
+              <option value="1 Yr">1 year</option>
+              <option value="2 Yr">2 years</option>
+              <option value="5 Yr">5 years</option>
+              <option value="10 Yr" selected>10 years</option>
+              <option value="30 Yr">30 years</option>
+            </select>
+          </div>
+          <div class="kpi compact">
+            <div class="k muted">Latest yield</div>
+            <div id="tsyValue" class="v">—</div>
+            <div id="tsyMeta" class="s muted"></div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="tsyFetchBtn" class="btn primary">Fetch latest Treasury yield</button>
+          <button id="tsyCopyBtn" class="btn">Copy yield</button>
+        </div>
+        <div id="tsyStatus" class="status"></div>
+      </section>
+    </section>
+
+    <section class="card">
+      <div class="cardHeader">
+        <h2>Paste into Calculator</h2>
+        <div class="pill">Quick workflow</div>
+      </div>
+      <ol class="list">
+        <li>Fetch a rate above.</li>
+        <li>Click “Copy rate”.</li>
+        <li>Go to <a href="index.html">Calculator</a> and paste into “Annual interest rate (%)”.</li>
+      </ol>
+    </section>
+
+    <footer class="site-footer">
+      <div class="muted">Educational tool only. Not financial advice.</div>
+    </footer>
+  </main>
+</body>
+</html>
