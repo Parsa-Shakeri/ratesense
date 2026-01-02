@@ -369,4 +369,38 @@ els.chartSplitBtn.addEventListener("click", () => {
 /* =========================================================
    Init
    ========================================================= */
+
+// ===== Scenario preload from Scenarios page =====
+(function preloadScenario(){
+  try{
+    const raw = localStorage.getItem("ratesense_scenario");
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    localStorage.removeItem("ratesense_scenario");
+
+    if (s.loanType && els.loanType) els.loanType.value = s.loanType;
+    if (isFinite(s.principal) && els.principal) els.principal.value = s.principal;
+    if (isFinite(s.apr) && els.apr) els.apr.value = s.apr;
+
+    if (s.loanType === "creditcard"){
+      if (els.ccMode && s.ccMode) els.ccMode.value = s.ccMode;
+      if (els.ccFixedPayment && isFinite(s.ccFixedPayment)) els.ccFixedPayment.value = s.ccFixedPayment;
+    } else {
+      if (els.termYears && isFinite(s.years)) els.termYears.value = s.years;
+      if (els.extraPayment && isFinite(s.extra)) els.extraPayment.value = s.extra;
+    }
+
+    if (s.loanType === "mortgage"){
+      if (els.annualTax && isFinite(s.tax)) els.annualTax.value = s.tax;
+      if (els.annualIns && isFinite(s.ins)) els.annualIns.value = s.ins;
+      if (els.monthlyHOA && isFinite(s.hoa)) els.monthlyHOA.value = s.hoa;
+    }
+
+    showHideFields();
+    if (els.status) els.status.textContent = "Scenario loaded. Click Calculate.";
+  } catch(e){
+    // ignore
+  }
+})();
+
 showHideFields();
