@@ -378,3 +378,37 @@ tbody tr:hover{background: rgba(255,255,255,.03)}
   .card{box-shadow:none; background:#fff; border:1px solid #ddd}
   .report{background:#fff; color:#000; border:1px solid #ddd}
 }
+
+/* ===== HEADER NAV FINAL FIX ===== */
+
+/* Ensure nav is horizontal and spaced */
+.header .navRight {
+  display: flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  margin-left: auto !important;
+}
+
+/* Make each link a proper clickable pill */
+.header .navRight a {
+  display: inline-flex !important;
+  align-items: center;
+  padding: 8px 12px !important;
+  border-radius: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Prevent text collapsing */
+.header .navRight a + a {
+  margin-left: 0 !important;
+}
+
+/* Mobile safety */
+@media (max-width: 820px) {
+  .header .navRight {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
+
