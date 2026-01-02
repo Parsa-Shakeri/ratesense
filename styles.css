@@ -62,46 +62,64 @@ a:hover{text-decoration:underline}
   padding-bottom: 14px;
 }
 
-/* Left nav */
-.navLeft{
+.headerDark{
+  background:#0b0f1b;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+
+/* IMPORTANT: you were missing .wrap earlier */
+.wrap{
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 18px;
+}
+
+.headerLayout{
   display:flex;
   align-items:center;
-  gap: 10px;
-  flex-wrap: wrap; /* no hamburger; wraps nicely on mobile */
+  justify-content:space-between;
+  gap: 18px;
 }
 
-.navLeft a{
-  padding: 10px 12px;
-  border-radius: 12px;
-  color: var(--muted);
-  border: 1px solid transparent;
+/* Brand on LEFT */
+.brandLeft{
+  display:flex;
+  align-items:center;
+  gap:10px;
   text-decoration:none;
-  font-weight: 600;
-  font-size: 14px;
 }
+.brandLeft, .brandLeft *{ text-decoration:none !important; }
+.brandLeft::before, .brandLeft::after{ display:none !important; }
 
-.navLeft a:hover{
-  color: var(--text);
-  border-color: rgba(255,255,255,.10);
-  background: rgba(255,255,255,.05);
-}
-
-.navLeft a.active{
-  color: var(--text);
-  border-color: rgba(138,180,255,.35);
-  background: rgba(138,180,255,.12);
-}
-
-/* Right brand */
-.brandRight{
+/* Nav on RIGHT */
+.navRight{
   margin-left:auto;
   display:flex;
   align-items:center;
-  gap: 10px;
+  gap: 14px;
+}
+.navRight a{
+  padding: 8px 10px;
+  border-radius: 10px;
+  text-decoration:none;
+  color:#a9b3c7;
+  font-weight:600;
+}
+.navRight a:hover{
+  background: rgba(255,255,255,0.08);
+  color:#e9edf5;
   text-decoration:none;
 }
+.navRight a.active{
+  background: rgba(90,160,255,0.18);
+  color:#e9edf5;
+}
 
-.brandRight, .brandRight *{ text-decoration:none !important; }
+@media (max-width: 820px){
+  .headerLayout{ flex-wrap: wrap; }
+  .navRight{ width:100%; justify-content:flex-end; flex-wrap:wrap; }
+}
+
 
 .brandMark{
   width: 34px;
