@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>RateSense — Scenarios</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="scenarios.js" defer></script>
+</head>
+<body>
+
+<header class="header headerDark">
+  <div class="wrap headerLayout">
+    <a class="brand brandLeft" href="./index.html" aria-label="RateSense home">
+      <div class="brandMark">RS</div>
+      <div class="brandText">
+        <div class="brandName">RateSense</div>
+        <div class="brandTag">Turn rate changes into real monthly impacts.</div>
+      </div>
+    </a>
+
+    <nav class="nav navRight" aria-label="Primary">
+      <a href="./index.html#calculator">Calculator</a>
+      <a href="./scenarios.html" class="active">Scenarios</a>
+      <a href="./compare.html">Compare</a>
+      <a href="./stress.html">Stress Test</a>
+      <a href="./rates.html">Rates</a>
+      <a href="./about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+  <section class="pageTitle">
+    <h1>Scenarios</h1>
+    <p class="muted">One-click examples that load directly into the calculator.</p>
+  </section>
+
+  <section class="grid two">
+    <section class="card">
+      <div class="cardHeader">
+        <h2>Mortgage (30-year)</h2>
+        <div class="pill">Common</div>
+      </div>
+      <p class="muted">$350,000 balance • 6.50% APR • Taxes/insurance included</p>
+      <div class="actions">
+        <button class="btn primary" data-scenario="mortgage350">Load into calculator</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="cardHeader">
+        <h2>Auto loan</h2>
+        <div class="pill">5 years</div>
+      </div>
+      <p class="muted">$25,000 balance • 7.90% APR</p>
+      <div class="actions">
+        <button class="btn primary" data-scenario="auto25">Load into calculator</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="cardHeader">
+        <h2>Student loan</h2>
+        <div class="pill">10 years</div>
+      </div>
+      <p class="muted">$40,000 balance • 6.00% APR</p>
+      <div class="actions">
+        <button class="btn primary" data-scenario="student40">Load into calculator</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="cardHeader">
+        <h2>Credit card example</h2>
+        <div class="pill">Payoff</div>
+      </div>
+      <p class="muted">$4,000 balance • 24.00% APR • $200 fixed payment</p>
+      <div class="actions">
+        <button class="btn primary" data-scenario="cc4k">Load into calculator</button>
+      </div>
+    </section>
+  </section>
+
+  <footer class="site-footer">
+    <div class="muted">Educational tool only. Not financial advice.</div>
+  </footer>
+</main>
+
+</body>
+</html>
